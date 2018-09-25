@@ -89,12 +89,15 @@ static int gettok() {
 //===----------------------------------------------------------------------===//
 
 namespace {
+	class ExprAST;
+
 	/// StatAST - 所有语句statement结点的基类.
 	class StatAST {
 	public:
 		virtual ~StatAST() = default;
 	};
-	
+
+	/*
 	/// AssignStatAST - 赋值语句结点
 	class AssignStatAST : public StatAST {
 		std::string Name; // 赋值号左边的标志符名
@@ -104,6 +107,7 @@ namespace {
 			std::unique_ptr<ExprAST> RHS) 
 			: Name(Name), RHS(std::move(RHS)) {}
 	};
+	*/
 
 	///RetStatAST - 返回语句结点
 	class RetStatAST :public StatAST {
@@ -160,7 +164,7 @@ namespace {
 	};
 
 	/// ExprAST - Base class for all expression nodes.
-	class ExprAST {
+	class ExprAST : public StatAST {
 	public:
 		virtual ~ExprAST() = default;
 	};
