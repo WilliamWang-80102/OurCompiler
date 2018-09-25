@@ -90,6 +90,69 @@ static int gettok() {
 //===----------------------------------------------------------------------===//
 
 namespace {
+	/// StatAST - 所有语句statement结点的基类.
+	class StatAST {
+	public:
+		virtual ~StatAST() = default;
+	};
+	
+	///AssignStatAST - 赋值语句结点
+	class AssignStatAST : public StatAST {
+		std::string Name;
+		std::unique_ptr<ExprAST> RHS;
+	public:
+		AssignStatAST(const std::string &Name, 
+			std::unique_ptr<ExprAST> RHS) 
+			: Name(Name), RHS(std::move(RHS)) {}
+	};
+
+	///RetStatAST - 返回语句结点
+	class RetStatAST :public StatAST {
+		std::unique_ptr<ExprAST> Expr;
+	public:
+		RetStatAST(std::unique_ptr<ExprAST> Expr): Expr(std::move(Expr)) {}
+	};
+
+	///PrtStatAST - 打印语句结点
+	class PrtStatAST : public StatAST {
+		std::unique_ptr<ExprAST> Expr;
+	public:
+		PrtStatAST(std::unique_ptr<ExprAST> Expr) : Expr(std::move(Expr)) {}
+	};
+
+	///NullStatAST - 空语句结点
+	class NullStatAST : public StatAST {
+	public:
+		NullStatAST() {}
+	};
+
+	///IfStatAST - 条件语句结点
+	class IfStatAST : public StatAST {
+		std::unique_ptr<ExprAST> Cond;
+		std::unique_ptr<StatAST> Stat;
+	public:
+		IfStatAST(std::unique_ptr<ExprAST> Cond, 
+			std::unique_ptr<StatAST> Stat) 
+			:Cond(std::move(Cond)), Stat(std::move(Stat)){}
+	};
+
+	///WhileStatAST - 当循环语句结点
+	class WhileStatAST : public StatAST {
+		std::unique_ptr<ExprAST> Cond;
+		std::unique_ptr<StatAST> Stat;
+	public:
+		WhileStatAST(std::unique_ptr<ExprAST> Cond,
+			std::unique_ptr<StatAST> Stat)
+			:Cond(std::move(Cond)), Stat(std::move(Stat)) {}
+	};
+
+	///BlockStatAST - 块状语句结点
+	class BlockStatAST : public StatAST {
+		std::vector<std::unique_ptr<StatAST>> Stats;
+	public:
+		BlockStatAST(std::vector<std::unique_ptr<StatAST>> Stats)
+		:Stats(std::move(Stats)){}
+	};
 
 	/// ExprAST - Base class for all expression nodes.
 	class ExprAST {
@@ -134,7 +197,7 @@ namespace {
 			std::vector<std::unique_ptr<ExprAST>> Args)
 			: Callee(Callee), Args(std::move(Args)) {}
 	};
-
+	
 	/// PrototypeAST - This class represents the "prototype" for a function,
 	/// which captures its name, and its argument names (thus implicitly the number
 	/// of arguments the function takes).
