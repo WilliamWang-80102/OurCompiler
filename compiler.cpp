@@ -307,7 +307,20 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 		return llvm::make_unique<VariableExprAST>(IdName);
 
 	//在此补充，如果标志符后为赋值符号的情况
+	if (CurTok == ':')
+	{
+		getNextToken();
+		if (CurTok == '=')
+		{
+			std::unique_ptr<ExprAST> RHS = ParseExpression();
+			if (!RHS) {
+				auto Result = new AssignStatAST(IdName, std::move(RHS));
+				return Result;
+			}
 
+				
+		}
+	}
 	// Call.
 	getNextToken(); // eat (
 	std::vector<std::unique_ptr<ExprAST>> Args;
