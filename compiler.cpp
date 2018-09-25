@@ -15,14 +15,19 @@
 // The lexer returns tokens [0-255] if it is an unknown character, otherwise one
 // of these for known things.
 enum Token {
+	//文件结束符
 	tok_eof = -1,
 
 	// commands
+	//函数定义符
 	tok_def = -2,
+	//函数申明符
 	tok_extern = -3,
 
 	// primary
+	//标识符
 	tok_identifier = -4,
+	//数字
 	tok_number = -5
 };
 
@@ -37,9 +42,9 @@ static int gettok() {
 	while (isspace(LastChar))
 		LastChar = getchar();
 
-	if (isalpha(LastChar)) { // identifier: [a-zA-Z][a-zA-Z0-9]*
+	if (isalpha(LastChar)) { //字母
 		IdentifierStr = LastChar;
-		while (isalnum((LastChar = getchar())))
+		while (isalnum((LastChar = getchar())))//字母或数字
 			IdentifierStr += LastChar;
 
 		if (IdentifierStr == "def")
@@ -49,7 +54,7 @@ static int gettok() {
 		return tok_identifier;
 	}
 
-	if (isdigit(LastChar) || LastChar == '.') { // Number: [0-9.]+
+	if (isdigit(LastChar) || LastChar == '.') { // 数字
 		std::string NumStr;
 		do {
 			NumStr += LastChar;
