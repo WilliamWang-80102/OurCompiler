@@ -24,12 +24,16 @@ enum Token {
 	// primary
 	tok_identifier = -4,
 	tok_number = -5
+
+	//在这里补充VSL的关键字FUNC等....
+
 };
 
 static std::string IdentifierStr; // Filled in if tok_identifier
 static double NumVal;             // Filled in if tok_number
 
-								  /// gettok - Return the next token from standard input.
+/// gettok - Return the next token from standard input.
+/// 请修改gettok代码，在读到合适的单词后，准确分析它的语法属性，返回词性。
 static int gettok() {
 	static int LastChar = ' ';
 
@@ -91,10 +95,10 @@ namespace {
 		virtual ~StatAST() = default;
 	};
 	
-	///AssignStatAST - 赋值语句结点
+	/// AssignStatAST - 赋值语句结点
 	class AssignStatAST : public StatAST {
-		std::string Name;
-		std::unique_ptr<ExprAST> RHS;
+		std::string Name; // 赋值号左边的标志符名
+		std::unique_ptr<ExprAST> RHS; // 赋值号右边的表达式
 	public:
 		AssignStatAST(const std::string &Name, 
 			std::unique_ptr<ExprAST> RHS) 
@@ -103,47 +107,53 @@ namespace {
 
 	///RetStatAST - 返回语句结点
 	class RetStatAST :public StatAST {
-		std::unique_ptr<ExprAST> Expr;
+		std::unique_ptr<ExprAST> Expr; // 返回语句后面的表达式
 	public:
 		RetStatAST(std::unique_ptr<ExprAST> Expr): Expr(std::move(Expr)) {}
 	};
 
-	///PrtStatAST - 打印语句结点
+	/// PrtStatAST - 打印语句结点
+	/// 打印语句后面的多个待输出表达式或字符串： PRINT print_item1, print_item2...
 	class PrtStatAST : public StatAST {
-		std::unique_ptr<ExprAST> Expr;
+		std::vector<std::unique_ptr<ExprAST>> Args; 
 	public:
-		PrtStatAST(std::unique_ptr<ExprAST> Expr) : Expr(std::move(Expr)) {}
+		PrtStatAST(std::vector<std::unique_ptr<ExprAST>> Args) : Args(std::move(Args)) {}
 	};
 
-	///NullStatAST - 空语句结点
+	/// NullStatAST - 空语句结点
 	class NullStatAST : public StatAST {
 	public:
 		NullStatAST() {}
 	};
 
-	///IfStatAST - 条件语句结点
+	/// IfStatAST - 条件语句结点
 	class IfStatAST : public StatAST {
-		std::unique_ptr<ExprAST> Cond;
-		std::unique_ptr<StatAST> Stat;
+		std::unique_ptr<ExprAST> Cond; // 条件表达式
+		std::unique_ptr<StatAST> ThenStat; // Cond 为True后的执行语句块
+		std::unique_ptr<StatAST> ElseStat; // Cond 为False后的执行语句块
 	public:
 		IfStatAST(std::unique_ptr<ExprAST> Cond, 
-			std::unique_ptr<StatAST> Stat) 
-			:Cond(std::move(Cond)), Stat(std::move(Stat)){}
+			std::unique_ptr<StatAST> ThenStat,
+			std::unique_ptr<StatAST> ElseStat)
+			:Cond(std::move(Cond)), 
+			ThenStat(std::move(ThenStat)), 
+			ElseStat(std::move(ElseStat)){}
 	};
 
-	///WhileStatAST - 当循环语句结点
+	/// WhileStatAST - 当循环语句结点
 	class WhileStatAST : public StatAST {
-		std::unique_ptr<ExprAST> Cond;
-		std::unique_ptr<StatAST> Stat;
+		std::unique_ptr<ExprAST> Cond; // 条件表达式
+		std::unique_ptr<StatAST> Stat; // Cond 为True后的执行语句块
 	public:
 		WhileStatAST(std::unique_ptr<ExprAST> Cond,
 			std::unique_ptr<StatAST> Stat)
 			:Cond(std::move(Cond)), Stat(std::move(Stat)) {}
 	};
 
-	///BlockStatAST - 块状语句结点
+	/// BlockStatAST - 块状语句结点
+	/// 语句块中可以包含零至多条语句
 	class BlockStatAST : public StatAST {
-		std::vector<std::unique_ptr<StatAST>> Stats;
+		std::vector<std::unique_ptr<StatAST>> Stats; //存储语句数组的属性
 	public:
 		BlockStatAST(std::vector<std::unique_ptr<StatAST>> Stats)
 		:Stats(std::move(Stats)){}
@@ -210,11 +220,12 @@ namespace {
 	/// FunctionAST - This class represents a function definition itself.
 	class FunctionAST {
 		std::unique_ptr<PrototypeAST> Proto;
-		std::unique_ptr<ExprAST> Body;
-
+		// std::unique_ptr<ExprAST> Body; 
+		// 函数的定义被修改为“签名” + “语句块”的形式
+		std::unique_ptr<BlockStatAST> Body;
 	public:
 		FunctionAST(std::unique_ptr<PrototypeAST> Proto,
-			std::unique_ptr<ExprAST> Body)
+			std::unique_ptr<BlockStatAST> Body)
 			: Proto(std::move(Proto)), Body(std::move(Body)) {}
 	};
 
@@ -281,6 +292,7 @@ static std::unique_ptr<ExprAST> ParseParenExpr() {
 /// identifierexpr
 ///   ::= identifier
 ///   ::= identifier '(' expression* ')'
+/// 补充赋值表达式 ::= identifier ':= ' expression
 static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	std::string IdName = IdentifierStr;
 
@@ -288,6 +300,8 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 
 	if (CurTok != '(') // Simple variable ref.
 		return llvm::make_unique<VariableExprAST>(IdName);
+
+	//在此补充，如果标志符后为赋值符号的情况
 
 	// Call.
 	getNextToken(); // eat (
@@ -314,7 +328,7 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	return llvm::make_unique<CallExprAST>(IdName, std::move(Args));
 }
 
-/// primary
+/// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
 ///   ::= identifierexpr
 ///   ::= numberexpr
 ///   ::= parenexpr
@@ -373,6 +387,7 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
 ///
 static std::unique_ptr<ExprAST> ParseExpression() {
 	auto LHS = ParsePrimary();
+	//这里如果读到LHS为空，检查后面是否为'-'
 	if (!LHS)
 		return nullptr;
 
@@ -501,6 +516,8 @@ int main() {
 	BinopPrecedence['+'] = 20;
 	BinopPrecedence['-'] = 20;
 	BinopPrecedence['*'] = 40; // highest.
+	//这里增加运算符的优先级
+
 
 							   // Prime the first token.
 	fprintf(stderr, "ready> ");
