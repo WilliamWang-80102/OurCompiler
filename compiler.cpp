@@ -58,6 +58,7 @@ static int gettok() {
 		return tok_identifier;
 	}
 
+	//此处应修改，避免出现1.2.3仍能通过的情况
 	if (isdigit(LastChar) || LastChar == '.') { // 数字
 		std::string NumStr;
 		do {
@@ -94,82 +95,8 @@ static int gettok() {
 //===----------------------------------------------------------------------===//
 
 namespace {
-	class ExprAST;
-
-	/// StatAST - 所有语句statement结点的基类.
-	class StatAST {
-	public:
-		virtual ~StatAST() = default;
-	};
-
-	/*
-	/// AssignStatAST - 赋值语句结点
-	class AssignStatAST : public StatAST {
-		std::string Name; // 赋值号左边的标志符名
-		std::unique_ptr<ExprAST> RHS; // 赋值号右边的表达式
-	public:
-		AssignStatAST(const std::string &Name, 
-			std::unique_ptr<ExprAST> RHS) 
-			: Name(Name), RHS(std::move(RHS)) {}
-	};
-	*/
-
-	///RetStatAST - 返回语句结点
-	class RetStatAST :public StatAST {
-		std::unique_ptr<ExprAST> Expr; // 返回语句后面的表达式
-	public:
-		RetStatAST(std::unique_ptr<ExprAST> Expr): Expr(std::move(Expr)) {}
-	};
-
-	/// PrtStatAST - 打印语句结点
-	/// 打印语句后面的多个待输出表达式或字符串： PRINT print_item1, print_item2...
-	class PrtStatAST : public StatAST {
-		std::vector<std::unique_ptr<ExprAST>> Args; 
-	public:
-		PrtStatAST(std::vector<std::unique_ptr<ExprAST>> Args) : Args(std::move(Args)) {}
-	};
-
-	/// NullStatAST - 空语句结点
-	class NullStatAST : public StatAST {
-	public:
-		NullStatAST() {}
-	};
-
-	/// IfStatAST - 条件语句结点
-	class IfStatAST : public StatAST {
-		std::unique_ptr<ExprAST> Cond; // 条件表达式
-		std::unique_ptr<StatAST> ThenStat; // Cond 为True后的执行语句块
-		std::unique_ptr<StatAST> ElseStat; // Cond 为False后的执行语句块
-	public:
-		IfStatAST(std::unique_ptr<ExprAST> Cond, 
-			std::unique_ptr<StatAST> ThenStat,
-			std::unique_ptr<StatAST> ElseStat)
-			:Cond(std::move(Cond)), 
-			ThenStat(std::move(ThenStat)), 
-			ElseStat(std::move(ElseStat)){}
-	};
-
-	/// WhileStatAST - 当循环语句结点
-	class WhileStatAST : public StatAST {
-		std::unique_ptr<ExprAST> Cond; // 条件表达式
-		std::unique_ptr<StatAST> Stat; // Cond 为True后的执行语句块
-	public:
-		WhileStatAST(std::unique_ptr<ExprAST> Cond,
-			std::unique_ptr<StatAST> Stat)
-			:Cond(std::move(Cond)), Stat(std::move(Stat)) {}
-	};
-
-	/// BlockStatAST - 块状语句结点
-	/// 语句块中可以包含零至多条语句
-	class BlockStatAST : public StatAST {
-		std::vector<std::unique_ptr<StatAST>> Stats; //存储语句数组的属性
-	public:
-		BlockStatAST(std::vector<std::unique_ptr<StatAST>> Stats)
-		:Stats(std::move(Stats)){}
-	};
-
 	/// ExprAST - Base class for all expression nodes.
-	class ExprAST : public StatAST {
+	class ExprAST {
 	public:
 		virtual ~ExprAST() = default;
 	};
@@ -188,6 +115,15 @@ namespace {
 
 	public:
 		VariableExprAST(const std::string &Name) : Name(Name) {}
+	};
+
+	/// AssignExpr - 负责处理赋值表达式
+	class AssignExpr : public ExprAST {
+		std::string Ident;
+		std::unique_ptr<ExprAST> Expr;
+	public:
+		AssignExpr(std::string Ident, std::unique_ptr<ExprAST> Expr)
+		:Ident(Ident),Expr(std::move(Expr)){}
 	};
 
 	/// BinaryExprAST - Expression class for a binary operator.
@@ -226,18 +162,73 @@ namespace {
 		const std::string &getName() const { return Name; }
 	};
 
+	class ExprsAST;
+
 	/// FunctionAST - This class represents a function definition itself.
-	class FunctionAST {
+	class FunctionAST : public ExprAST {
 		std::unique_ptr<PrototypeAST> Proto;
 		// std::unique_ptr<ExprAST> Body; 
 		// 函数的定义被修改为“签名” + “语句块”的形式
-		std::unique_ptr<BlockStatAST> Body;
+		std::unique_ptr<ExprsAST> Body;
 	public:
 		FunctionAST(std::unique_ptr<PrototypeAST> Proto,
-			std::unique_ptr<BlockStatAST> Body)
+			std::unique_ptr<ExprsAST> Body)
 			: Proto(std::move(Proto)), Body(std::move(Body)) {}
 	};
 
+	///ExprsAST - 语句块表达式结点
+	class ExprsAST : public ExprAST {
+		std::vector<std::unique_ptr<ExprAST>> Stats; //多句表达式向量
+	public:
+		ExprsAST(std::vector<std::unique_ptr<ExprAST>> Stats)
+			:Stats(std::move(Stats)) {}
+	};
+
+	///RetStatAST - 返回语句结点
+	class RetStatAST : public ExprAST {
+		std::unique_ptr<ExprAST> Expr; // 返回语句后面的表达式
+	public:
+		RetStatAST(std::unique_ptr<ExprAST> Expr) : Expr(std::move(Expr)) {}
+	};
+
+	/// PrtStatAST - 打印语句结点
+	/// 打印语句后面的多个待输出表达式或字符串： PRINT print_item1, print_item2...
+	class PrtStatAST : public ExprAST {
+		std::vector<std::unique_ptr<ExprAST>> Args;
+	public:
+		PrtStatAST(std::vector<std::unique_ptr<ExprAST>> Args) : Args(std::move(Args)) {}
+	};
+
+	/// NullStatAST - 空语句结点
+	class NullStatAST : public ExprAST {
+	public:
+		NullStatAST() {}
+	};
+
+	/// IfStatAST - 条件语句结点
+	class IfStatAST : public ExprAST {
+		std::unique_ptr<ExprAST> Cond; // 条件表达式
+		std::unique_ptr<ExprAST> ThenStat; // Cond 为True后的执行语句块
+
+		std::unique_ptr<ExprAST> ElseStat; // Cond 为False后的执行语句块
+	public:
+		IfStatAST(std::unique_ptr<ExprAST> Cond,
+			std::unique_ptr<ExprAST> ThenStat,
+			std::unique_ptr<ExprAST> ElseStat)
+			:Cond(std::move(Cond)),
+			ThenStat(std::move(ThenStat)),
+			ElseStat(std::move(ElseStat)) {}
+	};
+
+	/// WhileStatAST - 当循环语句结点
+	class WhileStatAST : public ExprAST {
+		std::unique_ptr<ExprAST> Cond; // 条件表达式
+		std::unique_ptr<ExprAST> Stat; // Cond 为True后的执行语句块
+	public:
+		WhileStatAST(std::unique_ptr<ExprAST> Cond,
+			std::unique_ptr<ExprAST> Stat)
+			:Cond(std::move(Cond)), Stat(std::move(Stat)) {}
+	};
 } // end anonymous namespace
 
   //===----------------------------------------------------------------------===//
@@ -318,11 +309,8 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 		{
 			std::unique_ptr<ExprAST> RHS = ParseExpression();
 			if (!RHS) {
-				auto Result = new AssignStatAST(IdName, std::move(RHS));
-				return Result;
-			}
-
-				
+				return llvm::make_unique<AssignExpr>(IdName, RHS);
+			}				
 		}
 	}
 	// Call.
@@ -461,6 +449,15 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 		return llvm::make_unique<FunctionAST>(std::move(Proto), std::move(E));
 	}
 	return nullptr;
+}
+
+///ParseBlockStat - 读到'{'时调用分析语句块函数
+static std::unique_ptr<FunctionAST> ParseBlockStat() {
+	//std::vector<std::unique_ptr<ExprAST>> Stats();
+	//吞噬'{'，不断分析字符串直到遇到'}'
+	while (getNextToken() != '}') {
+		auto E = ParseExpression();
+	}
 }
 
 /// external ::= 'extern' prototype
