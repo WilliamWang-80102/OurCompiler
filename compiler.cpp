@@ -28,10 +28,12 @@ enum Token {
 	//标识符
 	tok_identifier = -4,
 	//数字
-	tok_number = -5
-
+	tok_number = -5,
+	//return
+	tok_return = -6,
+	//print
+	tok_print = -7
 	//在这里补充VSL的关键字FUNC等....
-
 };
 
 static std::string IdentifierStr; // Filled in if tok_identifier
@@ -100,6 +102,11 @@ namespace {
 		virtual ~StatAST() = default;
 	};
 	
+
+
+
+
+
 	/// AssignStatAST - 赋值语句结点
 	class AssignStatAST : public StatAST {
 		std::string Name; // 赋值号左边的标志符名
@@ -163,6 +170,13 @@ namespace {
 		BlockStatAST(std::vector<std::unique_ptr<StatAST>> Stats)
 		:Stats(std::move(Stats)){}
 	};
+
+
+
+
+
+
+
 
 	/// ExprAST - Base class for all expression nodes.
 	class ExprAST {
@@ -294,6 +308,11 @@ static std::unique_ptr<ExprAST> ParseParenExpr() {
 	return V;
 }
 
+
+
+
+
+
 /// identifierexpr
 ///   ::= identifier
 ///   ::= identifier '(' expression* ')'
@@ -345,6 +364,46 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 
 	return llvm::make_unique<CallExprAST>(IdName, std::move(Args));
 }
+
+//实现返回语句
+static std::unique_ptr<ExprAST> ParseReturnExpr()
+{
+	if (CurTok == tok_return)
+	{
+		std::unique_ptr<ExprAST> Expr = ParseExpression();
+		if (!Expr) {
+			auto Result = new RetStatAST(std::move(Expr));
+			return Result;
+		}
+	}
+}
+
+//实现打印语句
+static std::unique_ptr<ExprAST> ParsePrintExpr()
+{
+	std::string print = "";
+	if (CurTok == tok_print)
+	{
+		getNextToken();
+		if (CurTok == '"')
+		while (getNextToken() != '"')
+		{
+			//getPrintString()函数用于获取双引号之间的内容
+			std::vector<std::unique_ptr<ExprAST>> Args += getPrintString();
+		}
+        if (CurTok == tok_number)
+			std::vector<std::unique_ptr<ExprAST>> Args += NumVal;
+	}
+	auto Result = new PrtStatAST(std::move(Args));
+	return Result;
+}
+
+
+
+
+
+
+
 
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
 ///   ::= identifierexpr
