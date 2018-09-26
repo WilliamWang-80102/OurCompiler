@@ -404,10 +404,13 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
 ///   ::= primary binoprhs
 ///
 static std::unique_ptr<ExprAST> ParseExpression() {
-	auto LHS = ParsePrimary();
 	//这里如果读到LHS为空，检查后面是否为'-'
-	if (!LHS)
-		return nullptr;
+	auto LHS = std::unique_ptr<ExprAST>();
+	if (CurTok != '-') {
+		LHS = ParsePrimary();
+		if (!LHS)
+			return nullptr;
+	}
 
 	return ParseBinOpRHS(0, std::move(LHS));
 }
@@ -531,9 +534,11 @@ int main() {
 	// Install standard binary operators.
 	// 1 is lowest precedence.
 	BinopPrecedence['<'] = 10;
+	BinopPrecedence['>'] = 10;
 	BinopPrecedence['+'] = 20;
 	BinopPrecedence['-'] = 20;
-	BinopPrecedence['*'] = 40; // highest.
+	BinopPrecedence['*'] = 40;
+	BinopPrecedence['/'] = 40;// highest.
 	//这里增加运算符的优先级
 
 
