@@ -28,10 +28,12 @@ enum Token {
 	//标识符
 	tok_identifier = -4,
 	//数字
-	tok_number = -5
-
+	tok_number = -5,
+	//return
+	tok_return = -6,
+	//print
+	tok_print = -7
 	//在这里补充VSL的关键字FUNC等....
-
 };
 
 static std::string IdentifierStr; // Filled in if tok_identifier
@@ -289,6 +291,11 @@ static std::unique_ptr<ExprAST> ParseParenExpr() {
 	return V;
 }
 
+
+
+
+
+
 /// identifierexpr
 ///   ::= identifier
 ///   ::= identifier '(' expression* ')'
@@ -336,6 +343,45 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	getNextToken();
 
 	return llvm::make_unique<CallExprAST>(IdName, std::move(Args));
+}
+
+//实现返回语句
+static std::unique_ptr<ExprAST> ParseReturnExpr()
+{
+	if (CurTok == tok_return)
+	{
+		std::unique_ptr<ExprAST> Expr = ParseExpression();
+		if (!Expr) {
+			//auto Result = new RetStatAST(std::move(Expr));
+			auto Result = llvm::make_unique<RetStatAST>(Expr);
+			return Result;
+		}
+	}
+}
+
+/*
+ * 此处getPrintString()函数待完成 
+ * 编译器报错问题未解决！
+ * @孙雄涛
+ */
+//实现打印语句
+static std::unique_ptr<ExprAST> ParsePrintExpr()
+{
+	std::string print = "";
+	if (CurTok == tok_print)
+	{
+		getNextToken();
+		if (CurTok == '"')
+		while (getNextToken() != '"')
+		{
+			//getPrintString()函数用于获取双引号之间的内容
+			std::vector<std::unique_ptr<ExprAST>> Args += getPrintString();
+		}
+        if (CurTok == tok_number)
+			std::vector<std::unique_ptr<ExprAST>> Args += NumVal;
+	}
+	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
+	return Result;
 }
 
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
@@ -396,10 +442,13 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
 ///   ::= primary binoprhs
 ///
 static std::unique_ptr<ExprAST> ParseExpression() {
-	auto LHS = ParsePrimary();
 	//这里如果读到LHS为空，检查后面是否为'-'
-	if (!LHS)
-		return nullptr;
+	auto LHS = std::unique_ptr<ExprAST>();
+	if (CurTok != '-') {
+		LHS = ParsePrimary();
+		if (!LHS)
+			return nullptr;
+	}
 
 	return ParseBinOpRHS(0, std::move(LHS));
 }
@@ -532,9 +581,11 @@ int main() {
 	// Install standard binary operators.
 	// 1 is lowest precedence.
 	BinopPrecedence['<'] = 10;
+	BinopPrecedence['>'] = 10;
 	BinopPrecedence['+'] = 20;
 	BinopPrecedence['-'] = 20;
-	BinopPrecedence['*'] = 40; // highest.
+	BinopPrecedence['*'] = 40;
+	BinopPrecedence['/'] = 40;// highest.
 	//这里增加运算符的优先级
 
 
