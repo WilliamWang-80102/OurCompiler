@@ -301,7 +301,24 @@ std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
 	return nullptr;
 }
 
+static std::unique_ptr<ExprAST> ParseNullExpr();
+static std::unique_ptr<ExprAST> ParseNumberExpr();
+static std::unique_ptr<ExprAST> ParseParenExpr();
+static std::unique_ptr<ExprAST> ParseIdentifierExpr();
+static std::unique_ptr<ExprAST> ParseBinOpRHS(int, std::unique_ptr<ExprAST>);
 static std::unique_ptr<ExprAST> ParseExpression();
+static std::unique_ptr<ExprAST> ParseReturnExpr();
+static std::unique_ptr<ExprAST> ParsePrintExpr();
+static std::unique_ptr<ExprAST> ParseWhileExpr();
+static std::unique_ptr<ExprAST> ParseIfExpr();
+static std::unique_ptr<ExprAST> ParseDclrExpr();
+static std::unique_ptr<ExprAST> ParsePrimary();
+static std::unique_ptr<PrototypeAST> ParsePrototype();
+static std::unique_ptr<FunctionAST> ParseTopLevelExpr();
+static std::unique_ptr<PrototypeAST> ParseExtern();
+static std::unique_ptr<ExprsAST> ParseStats();
+static std::unique_ptr<ExprAST> ParseStat();
+
 
 /// numberexpr ::= number
 static std::unique_ptr<ExprAST> ParseNumberExpr() {
@@ -621,6 +638,16 @@ static void HandleContinue() {
 	}
 }
 
+static void HandleDeclaration() {
+	if (ParseDclrExpr()) {
+		fprintf(stderr, "Parsed a declaration statement.\n");
+	}
+	else {
+		// Skip token for error recovery.
+		getNextToken();
+	}
+}
+
 static void HandleDefinition() {
 	if (ParseDefinition()) {
 		fprintf(stderr, "Parsed a function definition.\n");
@@ -717,6 +744,9 @@ static void MainLoop() {
 			break;
 		case tok_continue:
 			HandleContinue();
+			break;
+		case tok_var:
+			HandleDeclaration();
 			break;
 		case '{':
 			ParseStats();
