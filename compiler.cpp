@@ -20,7 +20,7 @@ enum Token {
 
 	// commands
 	//函数定义符
-	tok_def = -2,
+	tok_func = -2,
 	//函数申明符
 	tok_extern = -3,
 
@@ -28,10 +28,22 @@ enum Token {
 	//标识符
 	tok_identifier = -4,
 	//数字
-	tok_number = -5
-
+	tok_number = -5,
+	//return
+	tok_return = -6,
+	//print
+	
+	tok_print = -7,
 	//在这里补充VSL的关键字FUNC等....
-
+	tok_continue = -8,
+	tok_if = -9,
+	tok_then = -10,
+	tok_else = -11,
+	tok_fi = -12,
+	tok_while = -13,
+	tok_do = -14,
+	tok_done = -15,
+	tok_var = -16
 };
 
 static std::string IdentifierStr; // Filled in if tok_identifier
@@ -51,13 +63,36 @@ static int gettok() {
 		while (isalnum((LastChar = getchar())))//字母或数字
 			IdentifierStr += LastChar;
 
-		if (IdentifierStr == "def")
-			return tok_def;
+		if (IdentifierStr == "FUNC")
+			return tok_func;
 		if (IdentifierStr == "extern")
 			return tok_extern;
+		if (IdentifierStr == "PRINT")
+			return tok_print;
+		if (IdentifierStr == "RETURN")
+			return tok_return;
+		if (IdentifierStr == "CONTINUE")
+			return tok_continue;
+		if (IdentifierStr == "IF")
+			return tok_if;
+		if (IdentifierStr == "THEN")
+			return tok_then;
+		if (IdentifierStr == "ELSE")
+			return tok_else;
+		if (IdentifierStr == "FI")
+			return tok_fi;
+		if (IdentifierStr == "WHILE")
+			return tok_while;
+		if (IdentifierStr == "DO")
+			return tok_do;
+		if (IdentifierStr == "DONE")
+			return tok_done;
+		if (IdentifierStr == "VAR")
+			return tok_var;
 		return tok_identifier;
 	}
 
+	//此处应修改，避免出现1.2.3仍能通过的情况，修改后请删去本行
 	if (isdigit(LastChar) || LastChar == '.') { // 数字
 		std::string NumStr;
 		do {
@@ -69,6 +104,7 @@ static int gettok() {
 		return tok_number;
 	}
 
+	//此处修改对注释的处理，不再是'#'，而是"//"
 	if (LastChar == '#') {
 		// Comment until end of line.
 		do
@@ -94,76 +130,6 @@ static int gettok() {
 //===----------------------------------------------------------------------===//
 
 namespace {
-	/// StatAST - 所有语句statement结点的基类.
-	class StatAST {
-	public:
-		virtual ~StatAST() = default;
-	};
-	
-	/// AssignStatAST - 赋值语句结点
-	class AssignStatAST : public StatAST {
-		std::string Name; // 赋值号左边的标志符名
-		std::unique_ptr<ExprAST> RHS; // 赋值号右边的表达式
-	public:
-		AssignStatAST(const std::string &Name, 
-			std::unique_ptr<ExprAST> RHS) 
-			: Name(Name), RHS(std::move(RHS)) {}
-	};
-
-	///RetStatAST - 返回语句结点
-	class RetStatAST :public StatAST {
-		std::unique_ptr<ExprAST> Expr; // 返回语句后面的表达式
-	public:
-		RetStatAST(std::unique_ptr<ExprAST> Expr): Expr(std::move(Expr)) {}
-	};
-
-	/// PrtStatAST - 打印语句结点
-	/// 打印语句后面的多个待输出表达式或字符串： PRINT print_item1, print_item2...
-	class PrtStatAST : public StatAST {
-		std::vector<std::unique_ptr<ExprAST>> Args; 
-	public:
-		PrtStatAST(std::vector<std::unique_ptr<ExprAST>> Args) : Args(std::move(Args)) {}
-	};
-
-	/// NullStatAST - 空语句结点
-	class NullStatAST : public StatAST {
-	public:
-		NullStatAST() {}
-	};
-
-	/// IfStatAST - 条件语句结点
-	class IfStatAST : public StatAST {
-		std::unique_ptr<ExprAST> Cond; // 条件表达式
-		std::unique_ptr<StatAST> ThenStat; // Cond 为True后的执行语句块
-		std::unique_ptr<StatAST> ElseStat; // Cond 为False后的执行语句块
-	public:
-		IfStatAST(std::unique_ptr<ExprAST> Cond, 
-			std::unique_ptr<StatAST> ThenStat,
-			std::unique_ptr<StatAST> ElseStat)
-			:Cond(std::move(Cond)), 
-			ThenStat(std::move(ThenStat)), 
-			ElseStat(std::move(ElseStat)){}
-	};
-
-	/// WhileStatAST - 当循环语句结点
-	class WhileStatAST : public StatAST {
-		std::unique_ptr<ExprAST> Cond; // 条件表达式
-		std::unique_ptr<StatAST> Stat; // Cond 为True后的执行语句块
-	public:
-		WhileStatAST(std::unique_ptr<ExprAST> Cond,
-			std::unique_ptr<StatAST> Stat)
-			:Cond(std::move(Cond)), Stat(std::move(Stat)) {}
-	};
-
-	/// BlockStatAST - 块状语句结点
-	/// 语句块中可以包含零至多条语句
-	class BlockStatAST : public StatAST {
-		std::vector<std::unique_ptr<StatAST>> Stats; //存储语句数组的属性
-	public:
-		BlockStatAST(std::vector<std::unique_ptr<StatAST>> Stats)
-		:Stats(std::move(Stats)){}
-	};
-
 	/// ExprAST - Base class for all expression nodes.
 	class ExprAST {
 	public:
@@ -184,6 +150,15 @@ namespace {
 
 	public:
 		VariableExprAST(const std::string &Name) : Name(Name) {}
+	};
+
+	/// AssignExpr - 负责处理赋值表达式
+	class AssignExpr : public ExprAST {
+		std::string Ident;
+		std::unique_ptr<ExprAST> Expr;
+	public:
+		AssignExpr(std::string Ident, std::unique_ptr<ExprAST> Expr)
+		:Ident(Ident),Expr(std::move(Expr)){}
 	};
 
 	/// BinaryExprAST - Expression class for a binary operator.
@@ -222,18 +197,73 @@ namespace {
 		const std::string &getName() const { return Name; }
 	};
 
+	class ExprsAST;
+
 	/// FunctionAST - This class represents a function definition itself.
-	class FunctionAST {
+	class FunctionAST : public ExprAST {
 		std::unique_ptr<PrototypeAST> Proto;
 		// std::unique_ptr<ExprAST> Body; 
 		// 函数的定义被修改为“签名” + “语句块”的形式
-		std::unique_ptr<BlockStatAST> Body;
+		std::unique_ptr<ExprsAST> Body;
 	public:
 		FunctionAST(std::unique_ptr<PrototypeAST> Proto,
-			std::unique_ptr<BlockStatAST> Body)
+			std::unique_ptr<ExprsAST> Body)
 			: Proto(std::move(Proto)), Body(std::move(Body)) {}
 	};
 
+	///ExprsAST - 语句块表达式结点
+	class ExprsAST : public ExprAST {
+		std::vector<std::unique_ptr<ExprAST>> Stats; //多句表达式向量
+	public:
+		ExprsAST(std::vector<std::unique_ptr<ExprAST>> Stats)
+			:Stats(std::move(Stats)) {}
+	};
+
+	///RetStatAST - 返回语句结点
+	class RetStatAST : public ExprAST {
+		std::unique_ptr<ExprAST> Expr; // 返回语句后面的表达式
+	public:
+		RetStatAST(std::unique_ptr<ExprAST> Expr) : Expr(std::move(Expr)) {}
+	};
+
+	/// PrtStatAST - 打印语句结点
+	/// 打印语句后面的多个待输出表达式或字符串： PRINT print_item1, print_item2...
+	class PrtStatAST : public ExprAST {
+		std::vector<std::unique_ptr<ExprAST>> Args;
+	public:
+		PrtStatAST(std::vector<std::unique_ptr<ExprAST>> Args) : Args(std::move(Args)) {}
+	};
+
+	/// NullStatAST - 空语句结点
+	class NullStatAST : public ExprAST {
+	public:
+		NullStatAST() {}
+	};
+
+	/// IfStatAST - 条件语句结点
+	class IfStatAST : public ExprAST {
+		std::unique_ptr<ExprAST> Cond; // 条件表达式
+		std::unique_ptr<ExprAST> ThenStat; // Cond 为True后的执行语句块
+
+		std::unique_ptr<ExprAST> ElseStat; // Cond 为False后的执行语句块
+	public:
+		IfStatAST(std::unique_ptr<ExprAST> Cond,
+			std::unique_ptr<ExprAST> ThenStat,
+			std::unique_ptr<ExprAST> ElseStat)
+			:Cond(std::move(Cond)),
+			ThenStat(std::move(ThenStat)),
+			ElseStat(std::move(ElseStat)) {}
+	};
+
+	/// WhileStatAST - 当循环语句结点
+	class WhileStatAST : public ExprAST {
+		std::unique_ptr<ExprAST> Cond; // 条件表达式
+		std::unique_ptr<ExprAST> Stat; // Cond 为True后的执行语句块
+	public:
+		WhileStatAST(std::unique_ptr<ExprAST> Cond,
+			std::unique_ptr<ExprAST> Stat)
+			:Cond(std::move(Cond)), Stat(std::move(Stat)) {}
+	};
 } // end anonymous namespace
 
   //===----------------------------------------------------------------------===//
@@ -272,7 +302,24 @@ std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
 	return nullptr;
 }
 
+static std::unique_ptr<ExprAST> ParseNullExpr();
+static std::unique_ptr<ExprAST> ParseNumberExpr();
+static std::unique_ptr<ExprAST> ParseParenExpr();
+static std::unique_ptr<ExprAST> ParseIdentifierExpr();
+static std::unique_ptr<ExprAST> ParseBinOpRHS(int, std::unique_ptr<ExprAST>);
 static std::unique_ptr<ExprAST> ParseExpression();
+static std::unique_ptr<ExprAST> ParseReturnExpr();
+static std::unique_ptr<ExprAST> ParsePrintExpr();
+static std::unique_ptr<ExprAST> ParseWhileExpr();
+static std::unique_ptr<ExprAST> ParseIfExpr();
+static std::unique_ptr<ExprAST> ParseDclrExpr();
+static std::unique_ptr<ExprAST> ParsePrimary();
+static std::unique_ptr<PrototypeAST> ParsePrototype();
+static std::unique_ptr<FunctionAST> ParseTopLevelExpr();
+static std::unique_ptr<PrototypeAST> ParseExtern();
+static std::unique_ptr<ExprsAST> ParseStats();
+static std::unique_ptr<ExprAST> ParseStat();
+
 
 /// numberexpr ::= number
 static std::unique_ptr<ExprAST> ParseNumberExpr() {
@@ -294,10 +341,16 @@ static std::unique_ptr<ExprAST> ParseParenExpr() {
 	return V;
 }
 
+/// NullExpr ::= CONTINUE;
+static std::unique_ptr<ExprAST> ParseNullExpr() {
+	getNextToken();
+	return llvm::make_unique<NullStatAST>();
+}
+
 /// identifierexpr
 ///   ::= identifier
 ///   ::= identifier '(' expression* ')'
-/// 补充赋值表达式 ::= identifier ':= ' expression
+///   ::= identifier ':= ' expression
 static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	std::string IdName = IdentifierStr;
 
@@ -306,19 +359,19 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	if (CurTok != '(') // Simple variable ref.
 		return llvm::make_unique<VariableExprAST>(IdName);
 
-	//在此补充，如果标志符后为赋值符号的情况
+	//如果标志符后为赋值符号
 	if (CurTok == ':')
 	{
 		getNextToken();
+		//未考虑异常情况！
 		if (CurTok == '=')
 		{
+			//滤掉'='
+			getNextToken();
 			std::unique_ptr<ExprAST> RHS = ParseExpression();
 			if (!RHS) {
-				auto Result = new AssignStatAST(IdName, std::move(RHS));
-				return Result;
-			}
-
-				
+				return llvm::make_unique<AssignExpr>(IdName, RHS);
+			}				
 		}
 	}
 	// Call.
@@ -344,6 +397,88 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	getNextToken();
 
 	return llvm::make_unique<CallExprAST>(IdName, std::move(Args));
+}
+
+//ParseReturnExpr - 实现返回语句
+static std::unique_ptr<ExprAST> ParseReturnExpr()
+{
+	if (CurTok == tok_return)
+	{
+		std::unique_ptr<ExprAST> Expr = ParseExpression();
+		if (!Expr) {
+			//auto Result = new RetStatAST(std::move(Expr));
+			auto Result = llvm::make_unique<RetStatAST>(Expr);
+			return Result;
+		}
+	}
+}
+
+//ParsePrintExpr - 实现打印语句
+static std::unique_ptr<ExprAST> ParsePrintExpr()
+{
+	std::vector <std::unique_ptr<ExprAST>> Args;
+	if (CurTok == tok_print)
+	{
+		getNextToken();
+		if (CurTok == '"')
+		while (getNextToken() != '"')
+		{
+			//getPrintString()函数用于获取双引号之间的内容
+			Args.push_back(ParseExpression());
+		}
+		if (CurTok == tok_number)
+			Args.push_back(ParseNumberExpr());
+		if(CurTok==tok_identifier)
+			Args.push_back(ParsePrimary());
+	}
+	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
+	return Result;
+}
+
+//ParseWhileExpr - 实现While循环
+static std::unique_ptr<ExprAST> ParseWhileExpr() {
+	ParseParenExpr();
+	CurTok = getNextToken();
+	if (CurTok == -14) {
+		CurTok = getNextToken();
+		switch (CurTok) {
+		case -4:
+		case -9:
+		case -13:ParseStat(); break;
+		case '{':ParseStats(); break;
+			//default:error(); break;
+		}
+		//else error();
+		CurTok = getNextToken();
+		if (CurTok == -15) return WhileStatAST;
+		//else error(); //读到done可以安全退出
+	}
+}
+
+//ParseIfExpr - 实现If判断
+static std::unique_ptr<ExprAST> ParseIfExpr() {
+	
+	ParseParenExpr(); //分析if后面的条件
+	CurTok = getNextToken();
+	if (CurTok == -10) {
+		CurTok = getNextToken();
+		switch (CurTok) {
+		case -4:
+		case -9:
+		case -13:ParseStat(); break;
+		case '{':ParseStats(); break;
+			//default:error(); break;
+		}
+		//else error();
+		CurTok = getNextToken();
+		if (CurTok == -12) return IfStatAST;
+		//else error(); //读到fi可以安全退出
+	}
+}
+
+//ParseDclrExpr - 实现变量声明语句解析
+static std::unique_ptr<ExprAST> ParseDclrExpr() {
+
 }
 
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
@@ -404,10 +539,13 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
 ///   ::= primary binoprhs
 ///
 static std::unique_ptr<ExprAST> ParseExpression() {
-	auto LHS = ParsePrimary();
 	//这里如果读到LHS为空，检查后面是否为'-'
-	if (!LHS)
-		return nullptr;
+	std::unique_ptr<ExprAST> LHS = llvm::make_unique<ExprAST>();
+	if (CurTok != '-') {
+		LHS = ParsePrimary();
+		if (!LHS)
+			return nullptr;
+	}
 
 	return ParseBinOpRHS(0, std::move(LHS));
 }
@@ -423,7 +561,7 @@ static std::unique_ptr<PrototypeAST> ParsePrototype() {
 
 	if (CurTok != '(')
 		return LogErrorP("Expected '(' in prototype");
-
+	//VSL语言参数以','间隔，此处修改
 	std::vector<std::string> ArgNames;
 	while (getNextToken() == tok_identifier)
 		ArgNames.push_back(IdentifierStr);
@@ -436,14 +574,15 @@ static std::unique_ptr<PrototypeAST> ParsePrototype() {
 	return llvm::make_unique<PrototypeAST>(FnName, std::move(ArgNames));
 }
 
-/// definition ::= 'def' prototype expression
+/// definition ::= 'FUNC' prototype expression
 static std::unique_ptr<FunctionAST> ParseDefinition() {
-	getNextToken(); // eat def.
+	getNextToken(); // eat FUNC.
 	auto Proto = ParsePrototype();
 	if (!Proto)
 		return nullptr;
-
-	if (auto E = ParseExpression())
+	
+	//此处改为分析函数体的语句
+	if (auto E = ParseStats())
 		return llvm::make_unique<FunctionAST>(std::move(Proto), std::move(E));
 	return nullptr;
 }
@@ -465,9 +604,81 @@ static std::unique_ptr<PrototypeAST> ParseExtern() {
 	return ParsePrototype();
 }
 
+/// ParseStats - 分析语句块的函数
+static std::unique_ptr<ExprsAST> ParseStats() {
+	std::vector<std::unique_ptr<ExprAST>> Stats;
+	if (CurTok != '{') {
+		Stats.push_back(ParseStat());
+		return llvm::make_unique<ExprsAST>(std::move(Stats));
+	}
+	else {
+		//仅考虑正常语法情况，需增加异常处理
+		while (getNextToken() != '}') {
+			Stats.push_back(ParseStat());
+		}
+		return llvm::make_unique<ExprsAST>(std::move(Stats));
+	}
+}
+
+/// ParseStat - 分析单条语句的函数
+static std::unique_ptr<ExprAST> ParseStat() {
+	switch (CurTok)
+	{
+		//VAR
+	case tok_var:
+		ParseDclrExpr();
+
+		//IF
+	case tok_if:
+		ParseIfExpr();
+
+		//WHILE
+	case tok_while:
+		ParseWhileExpr();
+
+		//IDENTI
+	case tok_identifier:
+		ParseIdentifierExpr();
+
+		//RETURN
+	case tok_return:
+		ParseReturnExpr();
+
+		//PRINT
+	case tok_print:
+		ParsePrintExpr();
+
+	default:
+		//违背语法，报错
+		LogError("Unknown Statement!");
+		break;
+	}
+}
+
+
 //===----------------------------------------------------------------------===//
 // Top-Level parsing
 //===----------------------------------------------------------------------===//
+
+static void HandleContinue() {
+	if (ParseNullExpr()) {
+		fprintf(stderr, "Parsed a null expression.\n");
+	}
+	else {
+		// Skip token for error recovery.
+		getNextToken();
+	}
+}
+
+static void HandleDeclaration() {
+	if (ParseDclrExpr()) {
+		fprintf(stderr, "Parsed a declaration statement.\n");
+	}
+	else {
+		// Skip token for error recovery.
+		getNextToken();
+	}
+}
 
 static void HandleDefinition() {
 	if (ParseDefinition()) {
@@ -500,66 +711,43 @@ static void HandleTopLevelExpression() {
 	}
 }
 
-static void ParseStat() { //分析一个语句
-	switch (CurTok) {
-	case -4:ParseIdentifierExpr(); break; //读进来如果是标识符就意味着是赋值语句
-	case -9:ParseIfExpression(); break; //读进来if就进入对if语句的分析
-	case -13:ParseWhileExpression(); break; //读进来while就进入对while语句的分析
-	//default: error(); break; //读进来其他的会报错
+static void HandleIf() {
+	if (ParseIfExpr()) {
+		fprintf(stderr, "Parse a if statement\n");
+	}
+	else {
+		//Skip token for error recovery.
+		getNextToken();
 	}
 }
-
-static void ParseStats() { //分析一个语句
-	switch (CurTok) {
-	case -4:ParseIdentifierExpr(); break; //读进来如果是标识符就意味着是赋值语句
-	case -9:ParseIfExpression(); break; //读进来if就进入对if语句的分析
-	case -13:ParseWhileExpression(); break; //读进来while就进入对while语句的分析
-											//default: error(); break; //读进来其他的会报错
+static void HandleWhile() {
+	if (ParseWhileExpr()) {
+		fprintf(stderr, "Parse a while statement\n");
+	}
+	else {
+		//Skip token for error recovery.
+		getNextToken();
 	}
 }
-
-static void ParseIfExpression() { //分析if语句
-	ParseConditionExpression(); //分析if后面的条件
-	CurTok = getNextToken();
-	if (CurTok == -10) {
-		CurTok = getNextToken();
-		switch (CurTok) {
-		case -4:
-		case -9:
-		case -13:ParseStat(); break;
-		case '{':ParseStats(); break;
-			//default:error(); break;
-		}
-		//else error();
-		CurTok = getNextToken();
-		//if (CurTok == -12) break else error(); //读到fi可以安全退出
+static void HandlePrint() {
+	if (ParsePrintExpr()) {
+		fprintf(stderr, "Parse a print statement\n");
+	}
+	else {
+		//Skip token for error recovery.
+		getNextToken();
 	}
 }
-
-static void ParseWhileExpression() {
-		ParseConditionExpression();
-		CurTok = getNextToken();
-		if (CurTok == -14) {
-			CurTok = getNextToken();
-			switch (CurTok) {
-			case -4:
-			case -9:
-			case -13:ParseStat(); break;
-			case '{':ParseStats(); break;
-			//default:error(); break;
-			}
-		//else error();
-		CurTok = getNextToken();
-		//if (CurTok == -15) break else error(); //读到done可以安全退出
-		}
+static void HandleReturn() {
+	if (ParseReturnExpr()) {
+		fprintf(stderr, "Parse a return statement\n");
+	}
+	else {
+		//Skip token for error recovery.
+		getNextToken();
+	}
 }
-
-
-static void ParseConditionExpression() {
-	CurTok = getNextToken();
-	ParseParenExpr();
-}
-
+>>>>>>> 119e5da5e784a42154170607991fc87359e22059
 /// top ::= definition | external | expression | ';'
 static void MainLoop() {
 	while (true) {
@@ -570,11 +758,32 @@ static void MainLoop() {
 		case ';': // ignore top-level semicolons.
 			getNextToken();
 			break;
-		case tok_def:
+		case tok_func:
 			HandleDefinition();
 			break;
 		case tok_extern:
 			HandleExtern();
+			break;
+		case tok_if:
+			HandleIf();
+			break;
+		case tok_while:
+			HandleWhile();
+			break;
+		case tok_print:
+			HandlePrint();
+			break;
+		case tok_return:
+			HandleReturn();
+			break;
+		case tok_continue:
+			HandleContinue();
+			break;
+		case tok_var:
+			HandleDeclaration();
+			break;
+		case '{':
+			ParseStats();
 			break;
 		default:
 			HandleTopLevelExpression();
@@ -591,13 +800,15 @@ int main() {
 	// Install standard binary operators.
 	// 1 is lowest precedence.
 	BinopPrecedence['<'] = 10;
+	BinopPrecedence['>'] = 10;
 	BinopPrecedence['+'] = 20;
 	BinopPrecedence['-'] = 20;
-	BinopPrecedence['*'] = 40; // highest.
+	BinopPrecedence['*'] = 40;
+	BinopPrecedence['/'] = 40;// highest.
 	//这里增加运算符的优先级
 
 
-							   // Prime the first token.
+	// Prime the first token.
 	fprintf(stderr, "ready> ");
 	getNextToken();
 
