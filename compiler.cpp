@@ -500,6 +500,66 @@ static void HandleTopLevelExpression() {
 	}
 }
 
+static void ParseStat() { //分析一个语句
+	switch (CurTok) {
+	case -4:ParseIdentifierExpr(); break; //读进来如果是标识符就意味着是赋值语句
+	case -9:ParseIfExpression(); break; //读进来if就进入对if语句的分析
+	case -13:ParseWhileExpression(); break; //读进来while就进入对while语句的分析
+	//default: error(); break; //读进来其他的会报错
+	}
+}
+
+static void ParseStats() { //分析一个语句
+	switch (CurTok) {
+	case -4:ParseIdentifierExpr(); break; //读进来如果是标识符就意味着是赋值语句
+	case -9:ParseIfExpression(); break; //读进来if就进入对if语句的分析
+	case -13:ParseWhileExpression(); break; //读进来while就进入对while语句的分析
+											//default: error(); break; //读进来其他的会报错
+	}
+}
+
+static void ParseIfExpression() { //分析if语句
+	ParseConditionExpression(); //分析if后面的条件
+	CurTok = getNextToken();
+	if (CurTok == -10) {
+		CurTok = getNextToken();
+		switch (CurTok) {
+		case -4:
+		case -9:
+		case -13:ParseStat(); break;
+		case '{':ParseStats(); break;
+			//default:error(); break;
+		}
+		//else error();
+		CurTok = getNextToken();
+		//if (CurTok == -12) break else error(); //读到fi可以安全退出
+	}
+}
+
+static void ParseWhileExpression() {
+		ParseConditionExpression();
+		CurTok = getNextToken();
+		if (CurTok == -14) {
+			CurTok = getNextToken();
+			switch (CurTok) {
+			case -4:
+			case -9:
+			case -13:ParseStat(); break;
+			case '{':ParseStats(); break;
+			//default:error(); break;
+			}
+		//else error();
+		CurTok = getNextToken();
+		//if (CurTok == -15) break else error(); //读到done可以安全退出
+		}
+}
+
+
+static void ParseConditionExpression() {
+	CurTok = getNextToken();
+	ParseParenExpr();
+}
+
 /// top ::= definition | external | expression | ';'
 static void MainLoop() {
 	while (true) {
