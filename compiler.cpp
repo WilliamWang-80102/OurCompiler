@@ -92,7 +92,7 @@ static int gettok() {
 		return tok_identifier;
 	}
 
-	//此处应修改，避免出现1.2.3仍能通过的情况
+	//此处应修改，避免出现1.2.3仍能通过的情况，修改后请删去本行
 	if (isdigit(LastChar) || LastChar == '.') { // 数字
 		std::string NumStr;
 		do {
@@ -104,6 +104,7 @@ static int gettok() {
 		return tok_number;
 	}
 
+	//此处修改对注释的处理，不再是'#'，而是"//"
 	if (LastChar == '#') {
 		// Comment until end of line.
 		do
@@ -581,7 +582,7 @@ static std::unique_ptr<ExprsAST> ParseStats() {
 	}
 	else {
 		//仅考虑正常语法情况，需增加异常处理
-		while (gettok() != '}') {
+		while (getNextToken() != '}') {
 			Stats.push_back(ParseStat());
 		}
 		return llvm::make_unique<ExprsAST>(std::move(Stats));
