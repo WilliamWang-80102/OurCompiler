@@ -314,6 +314,8 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 		getNextToken();
 		if (CurTok == '=')
 		{
+			//滤掉'='
+			getNextToken();
 			std::unique_ptr<ExprAST> RHS = ParseExpression();
 			if (!RHS) {
 				return llvm::make_unique<AssignExpr>(IdName, RHS);
@@ -384,6 +386,7 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 	return Result;
 }
 
+
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
 ///   ::= identifierexpr
 ///   ::= numberexpr
@@ -443,7 +446,7 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
 ///
 static std::unique_ptr<ExprAST> ParseExpression() {
 	//这里如果读到LHS为空，检查后面是否为'-'
-	auto LHS = std::unique_ptr<ExprAST>();
+	std::unique_ptr<ExprAST> LHS = llvm::make_unique<ExprAST>();
 	if (CurTok != '-') {
 		LHS = ParsePrimary();
 		if (!LHS)
@@ -464,7 +467,7 @@ static std::unique_ptr<PrototypeAST> ParsePrototype() {
 
 	if (CurTok != '(')
 		return LogErrorP("Expected '(' in prototype");
-
+	//VSL语言参数以','间隔，此处修改
 	std::vector<std::string> ArgNames;
 	while (getNextToken() == tok_identifier)
 		ArgNames.push_back(IdentifierStr);
@@ -483,7 +486,8 @@ static std::unique_ptr<FunctionAST> ParseDefinition() {
 	auto Proto = ParsePrototype();
 	if (!Proto)
 		return nullptr;
-
+	
+	//此处改为分析函数体的语句
 	if (auto E = ParseExpression())
 		return llvm::make_unique<FunctionAST>(std::move(Proto), std::move(E));
 	return nullptr;
@@ -500,19 +504,55 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 	return nullptr;
 }
 
-///ParseBlockStat - 读到'{'时调用分析语句块函数
-static std::unique_ptr<FunctionAST> ParseBlockStat() {
-	//std::vector<std::unique_ptr<ExprAST>> Stats();
-	//吞噬'{'，不断分析字符串直到遇到'}'
-	while (getNextToken() != '}') {
-		auto E = ParseExpression();
-	}
-}
-
 /// external ::= 'extern' prototype
 static std::unique_ptr<PrototypeAST> ParseExtern() {
 	getNextToken(); // eat extern.
 	return ParsePrototype();
+}
+
+/// ParseStats - 分析语句块的函数
+static std::unique_ptr<ExprsAST> ParseStats() {
+	std::vector<std::unique_ptr<ExprAST>> Stats;
+	if (CurTok != '{') {
+		Stats.push_back(ParseStat());
+		return llvm::make_unique<ExprsAST>(std::move(Stats));
+	}
+	else {
+		//仅考虑正常语法情况
+		while (gettok() != '}') {
+			Stats.push_back(ParseStat());
+		}
+		return llvm::make_unique<ExprsAST>(std::move(Stats));
+	}
+}
+
+/// ParseStat - 分析单条语句的函数
+static std::unique_ptr<ExprAST> ParseStat() {
+	switch (CurTok)
+	{
+		//VAR
+	case:
+		ParseDclExpr();
+		//IF
+	case:
+		ParseIfExpr();
+		//WHILE
+	case:
+		ParseWhileExpr();
+		//IDENTI
+	case:
+		ParseIdentifierExpr();
+		//RETURN
+	case:
+		ParseReturnExpr();
+
+		//PRINT
+	case:
+		ParsePrintExpr();
+
+	default:
+		break;
+	}
 }
 
 //===----------------------------------------------------------------------===//
