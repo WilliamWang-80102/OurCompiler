@@ -20,7 +20,7 @@ enum Token {
 
 	// commands
 	//函数定义符
-	tok_def = -2,
+	tok_func = -2,
 	//函数申明符
 	tok_extern = -3,
 
@@ -32,8 +32,18 @@ enum Token {
 	//return
 	tok_return = -6,
 	//print
-	tok_print = -7
+	
+	tok_print = -7,
 	//在这里补充VSL的关键字FUNC等....
+	tok_continue = -8,
+	tok_if = -9,
+	tok_then = -10,
+	tok_else = -11,
+	tok_fi = -12,
+	tok_while = -13,
+	tok_do = -14,
+	tok_done = -15,
+	tok_var = -16
 };
 
 static std::string IdentifierStr; // Filled in if tok_identifier
@@ -53,10 +63,32 @@ static int gettok() {
 		while (isalnum((LastChar = getchar())))//字母或数字
 			IdentifierStr += LastChar;
 
-		if (IdentifierStr == "def")
-			return tok_def;
+		if (IdentifierStr == "FUNC")
+			return tok_func;
 		if (IdentifierStr == "extern")
 			return tok_extern;
+		if (IdentifierStr == "PRINT")
+			return tok_print;
+		if (IdentifierStr == "RETURN")
+			return tok_return;
+		if (IdentifierStr == "CONTINUE")
+			return tok_continue;
+		if (IdentifierStr == "IF")
+			return tok_if;
+		if (IdentifierStr == "THEN")
+			return tok_then;
+		if (IdentifierStr == "ELSE")
+			return tok_else;
+		if (IdentifierStr == "FI")
+			return tok_fi;
+		if (IdentifierStr == "WHILE")
+			return tok_while;
+		if (IdentifierStr == "DO")
+			return tok_do;
+		if (IdentifierStr == "DONE")
+			return tok_done;
+		if (IdentifierStr == "VAR")
+			return tok_var;
 		return tok_identifier;
 	}
 
@@ -291,15 +323,16 @@ static std::unique_ptr<ExprAST> ParseParenExpr() {
 	return V;
 }
 
-
-
-
-
+/// NullExpr ::= CONTINUE;
+static std::unique_ptr<ExprAST> ParseNullExpr() {
+	getNextToken();
+	return llvm::make_unique<NullStatAST>();
+}
 
 /// identifierexpr
 ///   ::= identifier
 ///   ::= identifier '(' expression* ')'
-/// 补充赋值表达式 ::= identifier ':= ' expression
+///   ::= identifier ':= ' expression
 static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	std::string IdName = IdentifierStr;
 
@@ -308,10 +341,11 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	if (CurTok != '(') // Simple variable ref.
 		return llvm::make_unique<VariableExprAST>(IdName);
 
-	//在此补充，如果标志符后为赋值符号的情况
+	//如果标志符后为赋值符号
 	if (CurTok == ':')
 	{
 		getNextToken();
+		//未考虑异常情况！
 		if (CurTok == '=')
 		{
 			//滤掉'='
@@ -347,7 +381,7 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	return llvm::make_unique<CallExprAST>(IdName, std::move(Args));
 }
 
-//实现返回语句
+//ParseReturnExpr - 实现返回语句
 static std::unique_ptr<ExprAST> ParseReturnExpr()
 {
 	if (CurTok == tok_return)
@@ -361,15 +395,10 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
 	}
 }
 
-/*
- * 此处getPrintString()函数待完成 
- * 编译器报错问题未解决！
- * @孙雄涛
- */
-//实现打印语句
+//ParsePrintExpr - 实现打印语句
 static std::unique_ptr<ExprAST> ParsePrintExpr()
 {
-	std::string print = "";
+	std::vector <std::unique_ptr<ExprAST>> Args;
 	if (CurTok == tok_print)
 	{
 		getNextToken();
@@ -377,15 +406,31 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 		while (getNextToken() != '"')
 		{
 			//getPrintString()函数用于获取双引号之间的内容
-			std::vector<std::unique_ptr<ExprAST>> Args += getPrintString();
+			Args.push_back(ParseExpression());
 		}
-        if (CurTok == tok_number)
-			std::vector<std::unique_ptr<ExprAST>> Args += NumVal;
+		if (CurTok == tok_number)
+			Args.push_back(ParseNumberExpr());
+		if(CurTok==tok_identifier)
+			Args.push_back(ParsePrimary());
 	}
 	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
 	return Result;
 }
 
+//ParseWhileExpr - 实现While循环
+static std::unique_ptr<ExprAST> ParseWhileExpr() {
+
+}
+
+//ParseIfExpr - 实现If判断
+static std::unique_ptr<ExprAST> ParseIfExpr() {
+
+}
+
+//ParseDclrExpr - 实现变量声明语句解析
+static std::unique_ptr<ExprAST> ParseDclrExpr() {
+
+}
 
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
 ///   ::= identifierexpr
@@ -480,15 +525,15 @@ static std::unique_ptr<PrototypeAST> ParsePrototype() {
 	return llvm::make_unique<PrototypeAST>(FnName, std::move(ArgNames));
 }
 
-/// definition ::= 'def' prototype expression
+/// definition ::= 'FUNC' prototype expression
 static std::unique_ptr<FunctionAST> ParseDefinition() {
-	getNextToken(); // eat def.
+	getNextToken(); // eat FUNC.
 	auto Proto = ParsePrototype();
 	if (!Proto)
 		return nullptr;
 	
 	//此处改为分析函数体的语句
-	if (auto E = ParseExpression())
+	if (auto E = ParseStats())
 		return llvm::make_unique<FunctionAST>(std::move(Proto), std::move(E));
 	return nullptr;
 }
@@ -518,7 +563,7 @@ static std::unique_ptr<ExprsAST> ParseStats() {
 		return llvm::make_unique<ExprsAST>(std::move(Stats));
 	}
 	else {
-		//仅考虑正常语法情况
+		//仅考虑正常语法情况，需增加异常处理
 		while (gettok() != '}') {
 			Stats.push_back(ParseStat());
 		}
@@ -531,33 +576,50 @@ static std::unique_ptr<ExprAST> ParseStat() {
 	switch (CurTok)
 	{
 		//VAR
-	case:
-		ParseDclExpr();
+	case tok_var:
+		ParseDclrExpr();
+
 		//IF
-	case:
+	case tok_if:
 		ParseIfExpr();
+
 		//WHILE
-	case:
+	case tok_while:
 		ParseWhileExpr();
+
 		//IDENTI
-	case:
+	case tok_identifier:
 		ParseIdentifierExpr();
+
 		//RETURN
-	case:
+	case tok_return:
 		ParseReturnExpr();
 
 		//PRINT
-	case:
+	case tok_print:
 		ParsePrintExpr();
 
 	default:
+		//违背语法，报错
+		LogError("Unknown Statement!");
 		break;
 	}
 }
 
+
 //===----------------------------------------------------------------------===//
 // Top-Level parsing
 //===----------------------------------------------------------------------===//
+
+static void HandleContinue() {
+	if (ParseNullExpr()) {
+		fprintf(stderr, "Parsed a null expression.\n");
+	}
+	else {
+		// Skip token for error recovery.
+		getNextToken();
+	}
+}
 
 static void HandleDefinition() {
 	if (ParseDefinition()) {
@@ -589,7 +651,42 @@ static void HandleTopLevelExpression() {
 		getNextToken();
 	}
 }
-
+static void HandleIf() {
+	if (ParseIfExpr()) {
+		fprintf(stderr, "Parse a if statement\n");
+	}
+	else {
+		//Skip token for error recovery.
+		getNextToken();
+	}
+}
+static void HandleWhile() {
+	if (ParseWhileExpr()) {
+		fprintf(stderr, "Parse a while statement\n");
+	}
+	else {
+		//Skip token for error recovery.
+		getNextToken();
+	}
+}
+static void HandlePrint() {
+	if (ParsePrintExpr()) {
+		fprintf(stderr, "Parse a print statement\n");
+	}
+	else {
+		//Skip token for error recovery.
+		getNextToken();
+	}
+}
+static void HandleReturn() {
+	if (ParseReturnExpr()) {
+		fprintf(stderr, "Parse a return statement\n");
+	}
+	else {
+		//Skip token for error recovery.
+		getNextToken();
+	}
+}
 /// top ::= definition | external | expression | ';'
 static void MainLoop() {
 	while (true) {
@@ -600,11 +697,29 @@ static void MainLoop() {
 		case ';': // ignore top-level semicolons.
 			getNextToken();
 			break;
-		case tok_def:
+		case tok_func:
 			HandleDefinition();
 			break;
 		case tok_extern:
 			HandleExtern();
+			break;
+		case tok_if:
+			HandleIf();
+			break;
+		case tok_while:
+			HandleWhile();
+			break;
+		case tok_print:
+			HandlePrint();
+			break;
+		case tok_return:
+			HandleReturn();
+			break;
+		case tok_continue:
+			HandleContinue();
+			break;
+		case '{':
+			ParseStats();
 			break;
 		default:
 			HandleTopLevelExpression();
@@ -629,7 +744,7 @@ int main() {
 	//这里增加运算符的优先级
 
 
-							   // Prime the first token.
+	// Prime the first token.
 	fprintf(stderr, "ready> ");
 	getNextToken();
 
