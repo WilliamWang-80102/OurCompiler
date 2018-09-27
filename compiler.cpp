@@ -32,6 +32,7 @@ enum Token {
 	//return
 	tok_return = -6,
 	//print
+	
 	tok_print = -7,
 	//在这里补充VSL的关键字FUNC等....
 	tok_continue = -8,
@@ -398,7 +399,7 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
  */
 //实现打印语句
 static std::unique_ptr<ExprAST> ParsePrintExpr()
-{/*
+{
 	std::string print = "";
 	if (CurTok == tok_print)
 	{
@@ -407,16 +408,15 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 		while (getNextToken() != '"')
 		{
 			//getPrintString()函数用于获取双引号之间的内容
-			//std::vector<std::unique_ptr<ExprAST>> Args += getPrintString();
+			std::vector<std::unique_ptr<ExprAST>> Args += getPrintString();
 		}
         if (CurTok == tok_number)
-			//std::vector<std::unique_ptr<ExprAST>> Args += NumVal;
+			std::vector<std::unique_ptr<ExprAST>> Args += NumVal;
 	}
-	*/
-	std::vector<std::unique_ptr<ExprAST>> Args;
 	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
 	return Result;
 }
+
 
 //实现While循环
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
@@ -427,6 +427,7 @@ static std::unique_ptr<ExprAST> ParseWhileExpr() {
 static std::unique_ptr<ExprAST> ParseIfExpr() {
 
 }
+
 
 
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
