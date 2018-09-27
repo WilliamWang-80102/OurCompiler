@@ -7,7 +7,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-
+using namespace std;
 //===----------------------------------------------------------------------===//
 // Lexer
 //===----------------------------------------------------------------------===//
@@ -400,7 +400,7 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
 //实现打印语句
 static std::unique_ptr<ExprAST> ParsePrintExpr()
 {
-	std::string print = "";
+	std::vector <std::unique_ptr<ExprAST>> Args;
 	if (CurTok == tok_print)
 	{
 		getNextToken();
@@ -408,10 +408,12 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 		while (getNextToken() != '"')
 		{
 			//getPrintString()函数用于获取双引号之间的内容
-			std::vector<std::unique_ptr<ExprAST>> Args += getPrintString();
+			Args.push_back(ParseExpression());
 		}
-        if (CurTok == tok_number)
-			std::vector<std::unique_ptr<ExprAST>> Args += NumVal;
+		if (CurTok == tok_number)
+			Args.push_back(ParseNumberExpr());
+		if(CurTok==tok_identifier)
+			Args.push_back(ParsePrimary());
 	}
 	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
 	return Result;
