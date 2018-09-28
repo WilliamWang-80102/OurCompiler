@@ -95,11 +95,18 @@ static int gettok() {
 	//此处应修改，避免出现1.2.3仍能通过的情况，修改后请删去本行
 	if (isdigit(LastChar) || LastChar == '.') { // 数字
 		std::string NumStr;
-		do {
-			NumStr += LastChar;
-			LastChar = getchar();
-		} while (isdigit(LastChar) || LastChar == '.');
-
+		int num_point=0;
+		if (num_point < 2) {
+			do {
+				if (LastChar == '.')
+					num_point++;
+				NumStr += LastChar;
+				LastChar = getchar();
+			} while (isdigit(LastChar) || LastChar == '.');
+		}
+		else {
+			LogError("Invalid demical");
+		}
 		NumVal = strtod(NumStr.c_str(), nullptr);
 		return tok_number;
 	}
@@ -439,18 +446,22 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
 	ParseParenExpr();
 	CurTok = getNextToken();
-	if (CurTok == -14) {
+	if (CurTok == tok_do) {
 		CurTok = getNextToken();
 		switch (CurTok) {
-		case -4:
-		case -9:
-		case -13:ParseStat(); break;
-		case '{':ParseStats(); break;
+		case tok_identifier:
+		case tok_if:
+		case tok_while:
+			ParseStat(); 
+			break;
+		case '{':
+			ParseStats(); 
+			break;
 			//default:error(); break;
 		}
 		//else error();
 		CurTok = getNextToken();
-		if (CurTok == -15) return WhileStatAST;
+		if (CurTok == tok_done) return nullptr;
 		//else error(); //读到done可以安全退出
 	}
 }
@@ -460,18 +471,24 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
 	
 	ParseParenExpr(); //分析if后面的条件
 	CurTok = getNextToken();
-	if (CurTok == -10) {
+	if (CurTok == tok_then ) {
 		CurTok = getNextToken();
 		switch (CurTok) {
-		case -4:
-		case -9:
-		case -13:ParseStat(); break;
-		case '{':ParseStats(); break;
+		case tok_identifier:
+
+		case tok_if:
+
+		case tok_while:
+			ParseStat(); 
+			break;
+		case '{':
+			ParseStats(); 
+			break;
 			//default:error(); break;
 		}
 		//else error();
 		CurTok = getNextToken();
-		if (CurTok == -12) return IfStatAST;
+		if (CurTok == tok_fi) return nullptr;
 		//else error(); //读到fi可以安全退出
 	}
 }
@@ -747,8 +764,9 @@ static void HandleReturn() {
 		getNextToken();
 	}
 }
->>>>>>> 119e5da5e784a42154170607991fc87359e22059
+
 /// top ::= definition | external | expression | ';'
+/*
 static void MainLoop() {
 	while (true) {
 		fprintf(stderr, "ready> ");
@@ -791,7 +809,23 @@ static void MainLoop() {
 		}
 	}
 }
-
+*/
+static void MainLoop() {
+	while (true) {
+		fprintf(stderr,"ready> ");
+		switch (CurTok) {
+		case tok_func:
+			HandleDefinition();
+			break;
+		case tok_eof:
+			return;
+		//非函数体报错
+		default:
+			LogError("Error!Expected a function definition");
+			break;
+		}
+	}
+}
 //===----------------------------------------------------------------------===//
 // Main driver code.
 //===----------------------------------------------------------------------===//
@@ -799,8 +833,6 @@ static void MainLoop() {
 int main() {
 	// Install standard binary operators.
 	// 1 is lowest precedence.
-	BinopPrecedence['<'] = 10;
-	BinopPrecedence['>'] = 10;
 	BinopPrecedence['+'] = 20;
 	BinopPrecedence['-'] = 20;
 	BinopPrecedence['*'] = 40;
