@@ -421,18 +421,30 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 	{
 		getNextToken();
 		if (CurTok == '"')
-		while (getNextToken() != '"')
 		{
-			//getPrintString()函数用于获取双引号之间的内容
-			Args.push_back(ParseExpression());
+			while (getNextToken() != '"')
+			{
+				//getPrintString()函数用于获取双引号之间的内容
+				Args.push_back(ParseExpression());
+			}
+			getNextToken();
 		}
 		if (CurTok == tok_number)
+		{
 			Args.push_back(ParseNumberExpr());
-		if(CurTok==tok_identifier)
+			getNextToken();
+		}
+		if (CurTok == tok_identifier)
+		{
 			Args.push_back(ParsePrimary());
+			getNextToken();
+		}
 	}
-	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
-	return Result;
+	if (CurTok == ';') 
+	{
+		auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
+		return Result;
+	}
 }
 
 //ParseWhileExpr - 实现While循环
