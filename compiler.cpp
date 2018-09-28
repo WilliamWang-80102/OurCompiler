@@ -443,12 +443,42 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 
 //ParseWhileExpr - 实现While循环
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
-	return nullptr;
+	ParseParenExpr();
+	CurTok = getNextToken();
+	if (CurTok == -14) {
+		CurTok = getNextToken();
+		switch (CurTok) {
+		case -4:
+		case -9:
+		case -13:ParseStat(); break;
+		case '{':ParseStats(); break;
+			//default:error(); break;
+		}
+		//else error();
+		CurTok = getNextToken();
+		if (CurTok == -15) return WhileStatAST;
+		//else error(); //读到done可以安全退出
+	}
 }
 
 //ParseIfExpr - 实现If判断
-static std::unique_ptr<ExprAST> ParseIfExpr() {
-	return nullptr;
+static std::unique_ptr<ExprAST> ParseIfExpr() {	
+	ParseParenExpr(); //分析if后面的条件
+	CurTok = getNextToken();
+	if (CurTok == -10) {
+		CurTok = getNextToken();
+		switch (CurTok) {
+		case -4:
+		case -9:
+		case -13:ParseStat(); break;
+		case '{':ParseStats(); break;
+			//default:error(); break;
+		}
+		//else error();
+		CurTok = getNextToken();
+		if (CurTok == -12) return IfStatAST;
+		//else error(); //读到fi可以安全退出
+	}
 }
 
 //ParseDclrExpr - 实现变量声明语句解析
@@ -685,6 +715,7 @@ static void HandleTopLevelExpression() {
 		getNextToken();
 	}
 }
+
 static void HandleIf() {
 	if (ParseIfExpr()) {
 		fprintf(stderr, "Parse a if statement\n");
@@ -721,6 +752,7 @@ static void HandleReturn() {
 		getNextToken();
 	}
 }
+>>>>>>> 119e5da5e784a42154170607991fc87359e22059
 /// top ::= definition | external | expression | ';'
 static void MainLoop() {
 	while (true) {
