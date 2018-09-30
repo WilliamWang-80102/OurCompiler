@@ -146,10 +146,10 @@ namespace {
 
 	/// VariableExprAST - Expression class for referencing a variable, like "a".
 	class VariableExprAST : public ExprAST {
-		std::string Name;
+		std::vector<std::string> Names;
 
 	public:
-		VariableExprAST(const std::string &Name) : Name(Name) {}
+		VariableExprAST(const std::vector<std::string> &Names) : Names(Names) {}
 	};
 
 	/// AssignExpr - 负责处理赋值表达式
