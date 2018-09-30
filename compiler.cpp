@@ -843,7 +843,6 @@ static void MainLoop() {
 */
 static void MainLoop() {
 	while (true) {
-		fprintf(stderr,"ready> ");
 		switch (CurTok) {
 		case tok_func:
 			HandleDefinition();
@@ -876,6 +875,7 @@ static void MainLoop() {
 			break;
 		}
 	}
+	fprintf(stderr, "ready> ");
 }
 //===----------------------------------------------------------------------===//
 // Main driver code.
