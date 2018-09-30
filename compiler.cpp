@@ -420,65 +420,78 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 	{
 		//滤去PRINT
 		getNextToken();
-		if (CurTok == '"')
-		while (getNextToken() != '"')
+		while (getNextToken() != ';')
 		{
-			//getPrintString()函数用于获取双引号之间的内容
-			auto E = ParseExpression();
-			Args.push_back(std::move(E));
-		}
-		if (CurTok == tok_number) {
-			auto E = ParseNumberExpr();
-			Args.push_back(std::move(E));
-		}
-			
-		if (CurTok == tok_identifier) {
-			auto E = ParsePrimary();
-			Args.push_back(std::move(E));
+			if (CurTok == '"')
+			{
+				while (getNextToken() != '"')
+				{
+					//getPrintString()函数用于获取双引号之间的内容
+					Args.push_back(ParseExpression());
+				}
+				getNextToken();
+			}
+			if (CurTok == tok_number)
+			{
+				Args.push_back(ParseNumberExpr());
+				getNextToken();
+			}
+			if (CurTok == tok_identifier)
+			{
+				Args.push_back(ParsePrimary());
+				getNextToken();
+			}
 		}
 	}
-	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
-	return Result;
-}
+	if (CurTok == ';') 
+	{
+		auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
+		return Result;
+	}
+	}
 
 //ParseWhileExpr - 实现While循环
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
+	std::unique_ptr<ExprAST> Cond, Stat;
+	std::unique_ptr<WhileStatAST> WhilePtr = llvm::make_unique<WhileStatAST>(std::move(Cond), std::move(Stat));
 	ParseParenExpr();
 	CurTok = getNextToken();
-	if (CurTok == -14) {
+	if (CurTok == tok_do) {
 		CurTok = getNextToken();
 		switch (CurTok) {
-		case -4:
-		case -9:
-		case -13:ParseStat(); break;
+		case tok_identifier:
+		case tok_if:
+		case tok_while:ParseStat(); break;
 		case '{':ParseStats(); break;
-			//default:error(); break;
+		default:return LogError("Not A WHile Parser!"); break;
 		}
-		//else error();
-		CurTok = getNextToken();
-		if (CurTok == -15) return WhileStatAST;
-		//else error(); //读到done可以安全退出
 	}
+		else return LogError("Expect 'then'!");
+		CurTok = getNextToken();
+		if (CurTok == tok_done) return WhilePtr;
+		else return LogError("Expect 'FI'!");//读到done可以安全退出
 }
 
 //ParseIfExpr - 实现If判断
 static std::unique_ptr<ExprAST> ParseIfExpr() {	
+	std::unique_ptr<ExprAST> Cond, ThenStat, ElseStat;
+	std::unique_ptr<IfStatAST> IfPtr = llvm::make_unique<IfStatAST>(std::move(Cond), std::move(ThenStat), std::move(ElseStat));
 	ParseParenExpr(); //分析if后面的条件
 	CurTok = getNextToken();
 	if (CurTok == -10) {
 		CurTok = getNextToken();
 		switch (CurTok) {
-		case -4:
-		case -9:
-		case -13:ParseStat(); break;
+		case tok_identifier:
+		case tok_if:
+		case tok_while:ParseStat(); break;
 		case '{':ParseStats(); break;
-			//default:error(); break;
+		default:return LogError("Not A If Parser!"); break;
 		}
-		//else error();
-		CurTok = getNextToken();
-		if (CurTok == -12) return IfStatAST;
-		//else error(); //读到fi可以安全退出
 	}
+	else return LogError("Expect 'DO'!");
+		CurTok = getNextToken();
+		if (CurTok == tok_fi) return IfPtr;
+		else return LogError("Expect 'DONE'!");//读到fi可以安全退出
 }
 
 //ParseDclrExpr - 实现变量声明语句解析
