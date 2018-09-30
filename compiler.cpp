@@ -153,12 +153,16 @@ namespace {
 	};
 
 	/// VariableExprAST - Expression class for referencing a variable, like "a".
-	class VariableExprAST :public ExprAST {
+	class VariableExprAST : public ExprAST {
 		std::string Name;
 
 	public:
-		VariableExprAST(const std::string &Name) :Name(Name) {};
+		VariableExprAST(const std::string &Name) : Name(Name) {}
 	};
+
+	/// DeclareExprAST - Expression like 'VAR x,y,z'.
+	class DeclareExprAST : public ExprAST {
+		std::vector<std::string> Names;
 
 	/// DeclareExprAST - Expression like 'VAR x,y,z'.
 	class DeclareExprAST : public ExprAST {
@@ -464,7 +468,7 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 		return Result;
 	}
 	}
-
+//@铁男 代码逻辑问题
 //ParseWhileExpr - 实现While循环
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
 	std::unique_ptr<ExprAST> Cond, Stat;
@@ -487,7 +491,7 @@ static std::unique_ptr<ExprAST> ParseWhileExpr() {
 		if (CurTok == tok_done) return WhilePtr;
 		else return LogError("Expect 'FI'!");//读到done可以安全退出
 }
-
+//@铁男 代码逻辑问题
 //ParseIfExpr - 实现If判断
 static std::unique_ptr<ExprAST> ParseIfExpr() {	
 	std::unique_ptr<ExprAST> Cond, ThenStat, ElseStat;
@@ -701,7 +705,6 @@ static std::unique_ptr<ExprAST> ParseStat() {
 		//违背语法，报错
 		LogError("Unknown Statement!");
 		return nullptr;
-		break;
 	}
 }
 
@@ -801,7 +804,6 @@ static void HandleReturn() {
 /*
 static void MainLoop() {
 	while (true) {
-		fprintf(stderr, "ready> ");
 		switch (CurTok) {
 		case tok_eof:
 			return;
@@ -840,6 +842,7 @@ static void MainLoop() {
 			break;
 		}
 	}
+	fprintf(stderr, "ready> ");
 }
 */
 static void MainLoop() {
