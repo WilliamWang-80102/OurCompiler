@@ -163,10 +163,6 @@ namespace {
 	/// DeclareExprAST - Expression like 'VAR x,y,z'.
 	class DeclareExprAST : public ExprAST {
 		std::vector<std::string> Names;
-
-	/// DeclareExprAST - Expression like 'VAR x,y,z'.
-	class DeclareExprAST : public ExprAST {
-		std::vector<std::string> Names;
 	public:
 		DeclareExprAST(const std::vector<std::string> &Names) : Names(Names) {}
 	};
