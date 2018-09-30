@@ -153,10 +153,18 @@ namespace {
 	};
 
 	/// VariableExprAST - Expression class for referencing a variable, like "a".
-	class VariableExprAST : public ExprAST {
+	class VariableExprAST :public ExprAST {
+		std::string Name;
+
+	public:
+		VariableExprAST(const std::string &Name) :Name(Name) {};
+	};
+
+	/// DeclareExprAST - Expression like 'VAR x,y,z'.
+	class DeclareExprAST : public ExprAST {
 		std::vector<std::string> Names;
 	public:
-		VariableExprAST(const std::vector<std::string> &Names) : Names(Names) {}
+		DeclareExprAST(const std::vector<std::string> &Names) : Names(Names) {}
 	};
 
 	/// AssignExpr - 负责处理赋值表达式
@@ -504,17 +512,19 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
 
 //ParseDclrExpr - 实现变量声明语句解析
 static std::unique_ptr<ExprAST> ParseDclrExpr() {
-	
-	std::vector<std::string> varlist;
-	std::string Name;
+	getNextToken();
+	std::vector<std::string> Names;
 	while (CurTok == tok_identifier) {
-		varlist.push_back(Name);
+		Names.push_back(IdentifierStr);
 		getNextToken();
 		if (CurTok == ',') getNextToken();//eat ','
 	}
-	return llvm::make_unique<VariableExprAST>(std::move(varlist));
-	
-	return nullptr;
+	if (Names.empty()) {
+		LogError("Need var names");
+		return nullptr;
+	}
+	else
+		return llvm::make_unique<DeclareExprAST>(std::move(Names));
 }
 
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
@@ -839,7 +849,27 @@ static void MainLoop() {
 		case tok_func:
 			HandleDefinition();
 			break;
+		case tok_identifier:
+			ParseIdentifierExpr();
+			break;
+		case tok_return:
+			HandleReturn();
+			break;
+		case tok_print:
+			HandlePrint();
+			break;
+		case tok_if:
+			HandleIf();
+			break;
+		case tok_while:
+			HandleWhile();
+			break;
+		case tok_var:
+			HandleDeclaration();
+			break;
 		case tok_eof:
+			return;
+		case ('#'):
 			return;
 		//非函数体报错
 		default:
