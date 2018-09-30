@@ -765,7 +765,6 @@ static void HandleReturn() {
 		getNextToken();
 	}
 }
->>>>>>> 119e5da5e784a42154170607991fc87359e22059
 /// top ::= definition | external | expression | ';'
 static void MainLoop() {
 	while (true) {
