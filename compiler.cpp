@@ -96,19 +96,20 @@ static int gettok() {
 	if (isdigit(LastChar) || LastChar == '.') { // 数字
 		std::string NumStr;
 		int num_point=0;
-		if (num_point < 2) {
 			do {
 				if (LastChar == '.')
 					num_point++;
 				NumStr += LastChar;
 				LastChar = getchar();
 			} while (isdigit(LastChar) || LastChar == '.');
-		}
-		else {
-			LogError("Invalid demical");
-		}
-		NumVal = strtod(NumStr.c_str(), nullptr);
-		return tok_number;
+			if (num_point < 2) {
+				NumVal = strtod(NumStr.c_str(), nullptr);
+				return tok_number;
+			}
+			else {
+				fprintf(stderr,"Invalid demical");
+				return 0;
+			}
 	}
 
 	//此处修改对注释的处理，不再是'#'，而是"//"
@@ -154,7 +155,6 @@ namespace {
 	/// VariableExprAST - Expression class for referencing a variable, like "a".
 	class VariableExprAST : public ExprAST {
 		std::string Name;
-
 	public:
 		VariableExprAST(const std::string &Name) : Name(Name) {}
 	};
@@ -485,9 +485,9 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
 	std::unique_ptr<ExprAST> Cond, ThenStat, ElseStat;
 	std::unique_ptr<IfStatAST> IfPtr = llvm::make_unique<IfStatAST>(std::move(Cond), std::move(ThenStat), std::move(ElseStat));
 	ParseParenExpr(); //分析if后面的条件
-	CurTok = getNextToken();
+	getNextToken();
 	if (CurTok == tok_then ) {
-		CurTok = getNextToken();
+		getNextToken();
 		switch (CurTok) {
 		case tok_identifier:
 		case tok_if:
@@ -504,6 +504,16 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
 
 //ParseDclrExpr - 实现变量声明语句解析
 static std::unique_ptr<ExprAST> ParseDclrExpr() {
+	
+	std::vector<std::string> varlist;
+	std::string Name;
+	while (CurTok == tok_identifier) {
+		varlist.push_back(Name);
+		getNextToken();
+		if (CurTok == ',') getNextToken();//eat ','
+	}
+	return llvm::make_unique<VariableExprAST>(std::move(varlist));
+	
 	return nullptr;
 }
 
@@ -588,9 +598,13 @@ static std::unique_ptr<PrototypeAST> ParsePrototype() {
 	if (CurTok != '(')
 		return LogErrorP("Expected '(' in prototype");
 	//VSL语言参数以','间隔，此处修改
+	//已修改 段
 	std::vector<std::string> ArgNames;
-	while (getNextToken() == tok_identifier)
+	getNextToken();//eat '('
+	while (CurTok == tok_identifier) {
 		ArgNames.push_back(IdentifierStr);
+		if (getNextToken() == ',') getNextToken();//eat ','
+	}
 	if (CurTok != ')')
 		return LogErrorP("Expected ')' in prototype");
 
