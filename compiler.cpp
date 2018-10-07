@@ -62,7 +62,7 @@ static int gettok() {
 		IdentifierStr = LastChar;
 		while (isalnum((LastChar = getchar())))//字母或数字
 			IdentifierStr += LastChar;
-
+		//以下考虑strcmp()函数的使用
 		if (IdentifierStr == "FUNC")
 			return tok_func;
 		if (IdentifierStr == "extern")
@@ -105,12 +105,17 @@ static int gettok() {
 	}
 
 	//此处修改对注释的处理，不再是'#'，而是"//"
-	if (LastChar == '#') {
+	if (LastChar == '/') {
+		//如果是除法，返回该除法符号
+		if ((LastChar = getchar()) != '/') 
+			return '/';
+
 		// Comment until end of line.
 		do
 			LastChar = getchar();
 		while (LastChar != EOF && LastChar != '\n' && LastChar != '\r');
 
+		//此处考虑/r/n的情况
 		if (LastChar != EOF)
 			return gettok();
 	}
@@ -270,6 +275,7 @@ namespace {
 			std::unique_ptr<ExprAST> Stat)
 			:Cond(std::move(Cond)), Stat(std::move(Stat)) {}
 	};
+
 } // end anonymous namespace
 
   //===----------------------------------------------------------------------===//
@@ -642,6 +648,8 @@ static std::unique_ptr<ExprsAST> ParseStats() {
 		while (getNextToken() != '}') {
 			Stats.push_back(std::move(ParseStat()));
 		}
+		//消耗掉'}'
+		getNextToken();
 		return llvm::make_unique<ExprsAST>(std::move(Stats));
 	}
 }
@@ -817,6 +825,28 @@ static void MainLoop() {
 }
 
 //===----------------------------------------------------------------------===//
+// Program Parse Code
+//===----------------------------------------------------------------------===//
+
+static std::unique_ptr<ExprAST> ParseProgram() {
+	
+	//存储程序中的所有函数或其它语句
+	std::vector<std::unique_ptr<ExprAST>> func_list;
+	while (true) {
+		switch (CurTok)
+		{
+		case tok_func:
+		{
+			auto E = ParseDefinition();
+			func_list.push_back(std::move(E));
+		}
+		case '#'://分析结束，返回程序语法树
+			return llvm::make_unique<ExprsAST>(std::move(func_list));
+		}
+	}
+}
+
+//===----------------------------------------------------------------------===//
 // Main driver code.
 //===----------------------------------------------------------------------===//
 
@@ -838,6 +868,7 @@ int main() {
 
 	// Run the main "interpreter loop" now.
 	MainLoop();
+	//ParseProgram();
 
 	return 0;
 }
