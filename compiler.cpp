@@ -113,16 +113,18 @@ static int gettok() {
 	}
 
 	//此处修改对注释的处理，不再是'#'，而是"//"
-	if (LastChar == '#') {
-		// Comment until end of line.
-		do
-			LastChar = getchar();
-		while (LastChar != EOF && LastChar != '\n' && LastChar != '\r');
+	if (LastChar == '/') {
+		LastChar = getchar();
+		if (LastChar == '/') {
+			// Comment until end of line.
+			do
+				LastChar = getchar();
+			while (LastChar != EOF && LastChar != '\n' && LastChar != '\r');
 
-		if (LastChar != EOF)
-			return gettok();
+			if (LastChar != EOF)
+				return gettok();
+		}
 	}
-
 	// Check for end of file.  Don't eat the EOF.
 	if (LastChar == EOF)
 		return tok_eof;
@@ -592,7 +594,6 @@ static std::unique_ptr<ExprAST> ParseExpression() {
 		if (!LHS)
 			return nullptr;
 	}
-
 	return ParseBinOpRHS(0, std::move(LHS));
 }
 
@@ -843,6 +844,7 @@ static void MainLoop() {
 */
 static void MainLoop() {
 	while (true) {
+		fprintf(stderr, "ready> ");
 		switch (CurTok) {
 		case tok_func:
 			HandleDefinition();
@@ -867,7 +869,7 @@ static void MainLoop() {
 			break;
 		case tok_eof:
 			return;
-		case ('#'):
+		case '#':
 			return;
 		//非函数体报错
 		default:
@@ -875,7 +877,6 @@ static void MainLoop() {
 			break;
 		}
 	}
-	fprintf(stderr, "ready> ");
 }
 //===----------------------------------------------------------------------===//
 // Main driver code.
@@ -890,10 +891,10 @@ int main() {
 	BinopPrecedence['/'] = 40;// highest.
 	//这里增加运算符的优先级
 
-
 	// Prime the first token.
 	fprintf(stderr, "ready> ");
 	getNextToken();
+	
 
 	// Run the main "interpreter loop" now.
 	MainLoop();
