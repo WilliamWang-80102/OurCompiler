@@ -95,13 +95,21 @@ static int gettok() {
 	//此处应修改，避免出现1.2.3仍能通过的情况，修改后请删去本行
 	if (isdigit(LastChar) || LastChar == '.') { // 数字
 		std::string NumStr;
-		do {
-			NumStr += LastChar;
-			LastChar = getchar();
-		} while (isdigit(LastChar) || LastChar == '.');
-
-		NumVal = strtod(NumStr.c_str(), nullptr);
-		return tok_number;
+		int num_point=0;
+			do {
+				if (LastChar == '.')
+					num_point++;
+				NumStr += LastChar;
+				LastChar = getchar();
+			} while (isdigit(LastChar) || LastChar == '.');
+			if (num_point < 2) {
+				NumVal = strtod(NumStr.c_str(), nullptr);
+				return tok_number;
+			}
+			else {
+				fprintf(stderr,"Invalid demical");
+				return 0;
+			}
 	}
 
 	//此处修改对注释的处理，不再是'#'，而是"//"
@@ -160,7 +168,6 @@ namespace {
 	/// DeclareExprAST - Expression like 'VAR x,y,z'.
 	class DeclareExprAST : public ExprAST {
 		std::vector<std::string> Names;
-
 	public:
 		DeclareExprAST(const std::vector<std::string> &Names) : Names(Names) {}
 	};
@@ -479,6 +486,7 @@ static std::unique_ptr<ExprAST> ParseWhileExpr() {
 		case '{':ParseStats(); break;
 		default:return LogError("Not A WHile Parser!"); break;
 		}
+
 	}
 		else return LogError("Expect 'then'!");
 		CurTok = getNextToken();
@@ -491,9 +499,9 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
 	std::unique_ptr<ExprAST> Cond, ThenStat, ElseStat;
 	std::unique_ptr<IfStatAST> IfPtr = llvm::make_unique<IfStatAST>(std::move(Cond), std::move(ThenStat), std::move(ElseStat));
 	ParseParenExpr(); //分析if后面的条件
-	CurTok = getNextToken();
-	if (CurTok == -10) {
-		CurTok = getNextToken();
+	getNextToken();
+	if (CurTok == tok_then ) {
+		getNextToken();
 		switch (CurTok) {
 		case tok_identifier:
 		case tok_if:
@@ -510,7 +518,19 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
 
 //ParseDclrExpr - 实现变量声明语句解析
 static std::unique_ptr<ExprAST> ParseDclrExpr() {
-	return nullptr;
+	getNextToken();
+	std::vector<std::string> Names;
+	while (CurTok == tok_identifier) {
+		Names.push_back(IdentifierStr);
+		getNextToken();
+		if (CurTok == ',') getNextToken();//eat ','
+	}
+	if (Names.empty()) {
+		LogError("Need var names");
+		return nullptr;
+	}
+	else
+		return llvm::make_unique<DeclareExprAST>(std::move(Names));
 }
 
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
@@ -594,9 +614,13 @@ static std::unique_ptr<PrototypeAST> ParsePrototype() {
 	if (CurTok != '(')
 		return LogErrorP("Expected '(' in prototype");
 	//VSL语言参数以','间隔，此处修改
+	//已修改 段
 	std::vector<std::string> ArgNames;
-	while (getNextToken() == tok_identifier)
+	getNextToken();//eat '('
+	while (CurTok == tok_identifier) {
 		ArgNames.push_back(IdentifierStr);
+		if (getNextToken() == ',') getNextToken();//eat ','
+	}
 	if (CurTok != ')')
 		return LogErrorP("Expected ')' in prototype");
 
@@ -781,6 +805,7 @@ static void HandleReturn() {
 	}
 }
 /// top ::= definition | external | expression | ';'
+/*
 static void MainLoop() {
 	while (true) {
 		switch (CurTok) {
@@ -823,7 +848,43 @@ static void MainLoop() {
 	}
 	fprintf(stderr, "ready> ");
 }
-
+*/
+static void MainLoop() {
+	while (true) {
+		switch (CurTok) {
+		case tok_func:
+			HandleDefinition();
+			break;
+		case tok_identifier:
+			ParseIdentifierExpr();
+			break;
+		case tok_return:
+			HandleReturn();
+			break;
+		case tok_print:
+			HandlePrint();
+			break;
+		case tok_if:
+			HandleIf();
+			break;
+		case tok_while:
+			HandleWhile();
+			break;
+		case tok_var:
+			HandleDeclaration();
+			break;
+		case tok_eof:
+			return;
+		case ('#'):
+			return;
+		//非函数体报错
+		default:
+			LogError("Error!Expected a function definition");
+			break;
+		}
+	}
+	fprintf(stderr, "ready> ");
+}
 //===----------------------------------------------------------------------===//
 // Program Parse Code
 //===----------------------------------------------------------------------===//
@@ -853,8 +914,6 @@ static std::unique_ptr<ExprAST> ParseProgram() {
 int main() {
 	// Install standard binary operators.
 	// 1 is lowest precedence.
-	BinopPrecedence['<'] = 10;
-	BinopPrecedence['>'] = 10;
 	BinopPrecedence['+'] = 20;
 	BinopPrecedence['-'] = 20;
 	BinopPrecedence['*'] = 40;
