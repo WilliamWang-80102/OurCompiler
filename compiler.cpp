@@ -509,7 +509,7 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 			}
 		}
 	}
-	if (CurTok == ';') 
+	if (CurTok == '\n') 
 	{
 		auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
 		return Result;
