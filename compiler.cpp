@@ -469,11 +469,11 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
 {
 	if (CurTok == tok_return)
 	{
+		getNextToken();
 		std::unique_ptr<ExprAST> Expr = ParseExpression();
 		if (!Expr) {
 			//auto Result = new RetStatAST(std::move(Expr));
-			auto Result = llvm::make_unique<RetStatAST>(std::move(Expr));
-			return Result;
+			return llvm::make_unique<RetStatAST>(std::move(Expr));
 		}
 	}
 }
@@ -511,8 +511,7 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 	}
 	if (CurTok == '\n') 
 	{
-		auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
-		return Result;
+		return llvm::make_unique<PrtStatAST>(std::move(Args));
 	}
 	}
 //@ÌúÄĞ ´úÂëÂß¼­ÎÊÌâ
