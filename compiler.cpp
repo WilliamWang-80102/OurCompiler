@@ -486,7 +486,7 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 	{
 		//滤去PRINT
 		getNextToken();
-		while (getNextToken() != ';')
+		while (getNextToken() != '\n')
 		{
 			if (CurTok == '"')
 			{
@@ -508,12 +508,12 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 				getNextToken();
 			}
 		}
+		if (CurTok == '\n')
+		{
+			return llvm::make_unique<PrtStatAST>(std::move(Args));
+		}
 	}
-	if (CurTok == '\n') 
-	{
-		return llvm::make_unique<PrtStatAST>(std::move(Args));
-	}
-	}
+}
 //@铁男 代码逻辑问题
 //ParseWhileExpr - 实现While循环
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
