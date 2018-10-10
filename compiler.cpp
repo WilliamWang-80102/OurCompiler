@@ -149,7 +149,8 @@ namespace {
 	class ExprAST {
 	public:
 		virtual ~ExprAST() = default;
-		virtual void printAST() = 0;
+		virtual void printAST() {
+		};
 	};
 
 	/// NumberExprAST - Expression class for numeric literals like "1.0".
@@ -516,11 +517,13 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 }
 //处理IF和WHILE后面的条件语句
 static std::unique_ptr<ExprAST> ParseConditionExpr() {
-	std::unique_ptr<ExprAST> Cond;
-	CurTok = getNextToken();
-	if (CurTok = '(') return ParseParenExpr();
-	else if ((CurTok = tok_number) || (CurTok = tok_var)) return Cond;
-	else return LogError("Not A Condition Expression!");
+	getNextToken();
+	std::unique_ptr<ExprAST> Cond = ParseExpression();
+	if (Cond) {
+		return Cond;
+	}
+	else LogError("Expected condition statement!");
+	
 }
 //ParseWhileExpr - 实现While循环
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
@@ -529,41 +532,40 @@ static std::unique_ptr<ExprAST> ParseWhileExpr() {
 	ParseConditionExpr();
 	CurTok = getNextToken();
 	if (CurTok == tok_do) {
-		CurTok = getNextToken();
-		switch (CurTok) {
-		case tok_identifier:
-		case tok_if:
-		case tok_while:ParseStat(); break;
-		case '{':ParseStats(); break;
-		default:return LogError("Not A WHile Parser!"); break;
+		getNextToken();
+		Stat = ParseStats();
+		if (!Stat) return LogError("Expect 'DO' statements!");
+		return LogError("Not A WHILE Parser!"); 
 		}
-
-	}
-		else return LogError("Expect 'then'!");
-		CurTok = getNextToken();
+		else return LogError("Expect 'DO'!");
 		if (CurTok == tok_done) return WhilePtr;
-		else return LogError("Expect 'FI'!");//读到done可以安全退出
+		else return LogError("Expect 'DONE'!");//读到done可以安全退出
 }
 //ParseIfExpr - 实现If判断
 static std::unique_ptr<ExprAST> ParseIfExpr() {	
 	std::unique_ptr<ExprAST> Cond, ThenStat, ElseStat;
 	std::unique_ptr<IfStatAST> IfPtr = llvm::make_unique<IfStatAST>(std::move(Cond), std::move(ThenStat), std::move(ElseStat));
 	ParseConditionExpr(); //分析if后面的条件
-	getNextToken();
+
 	if (CurTok == tok_then ) {
 		getNextToken();
-		switch (CurTok) {
-		case tok_identifier:
-		case tok_if:
-		case tok_while:ParseStat(); break;
-		case '{':ParseStats(); break;
-		default:return LogError("Not A If Parser!"); break;
-		}
+		ThenStat = ParseStats();
+		if (!ThenStat) return LogError("Expect 'THEN' statements!"); 
 	}
-	else return LogError("Expect 'DO'!");
-		CurTok = getNextToken();
+	else return LogError("Expect 'THEN'!");
 		if (CurTok == tok_fi) return IfPtr;
-		else return LogError("Expect 'DONE'!");//读到fi可以安全退出
+		else if (CurTok == tok_else) {
+			getNextToken();
+			ElseStat = ParseStats();
+			if (ElseStat) {
+				if (CurTok == tok_fi) { 
+					//getNextToken();
+					return IfPtr;
+				}
+				else return LogError("Expect 'FI'!");
+			}
+			else LogError("Expect 'ELSE' statements!");
+		}
 }
 
 //ParseDclrExpr - 实现变量声明语句解析
@@ -934,6 +936,7 @@ static void MainLoop() {
 		//非函数体报错
 		default:
 			LogError("Error!Expected a function definition");
+			getNextToken();
 			break;
 		}
 	}
