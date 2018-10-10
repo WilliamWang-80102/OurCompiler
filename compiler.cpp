@@ -469,11 +469,11 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
 {
 	if (CurTok == tok_return)
 	{
+		getNextToken();
 		std::unique_ptr<ExprAST> Expr = ParseExpression();
 		if (!Expr) {
 			//auto Result = new RetStatAST(std::move(Expr));
-			auto Result = llvm::make_unique<RetStatAST>(std::move(Expr));
-			return Result;
+			return llvm::make_unique<RetStatAST>(std::move(Expr));
 		}
 	}
 }
@@ -481,13 +481,12 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
 //ParsePrintExpr - 实现打印语句
 static std::unique_ptr<ExprAST> ParsePrintExpr()
 {
-	std::vector <std::u
-		nique_ptr<ExprAST>> Args;
+	std::vector <std::unique_ptr<ExprAST>> Args;
 	if (CurTok == tok_print)
 	{
 		//滤去PRINT
 		getNextToken();
-		while (getNextToken() != ';')
+		while (getNextToken() != '\n')
 		{
 			if (CurTok == '"')
 			{
@@ -509,21 +508,20 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 				getNextToken();
 			}
 		}
+		if (CurTok == '\n')
+		{
+			return llvm::make_unique<PrtStatAST>(std::move(Args));
+		}
 	}
-	if (CurTok == ';') 
-	{
-		auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
-		return Result;
-	}
-	}
-//@铁男 代码逻辑问题
+}
+//处理IF和WHILE后面的条件语句
 static std::unique_ptr<ExprAST> ParseConditionExpr() {
 	std::unique_ptr<ExprAST> Cond;
 	CurTok = getNextToken();
 	if (CurTok = '(') return ParseParenExpr();
 	else if ((CurTok = tok_number) || (CurTok = tok_var)) return Cond;
 	else return LogError("Not A Condition Expression!");
-}//处理IF和WHILE后面的条件语句
+}
 //ParseWhileExpr - 实现While循环
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
 	std::unique_ptr<ExprAST> Cond, Stat;
@@ -546,7 +544,6 @@ static std::unique_ptr<ExprAST> ParseWhileExpr() {
 		if (CurTok == tok_done) return WhilePtr;
 		else return LogError("Expect 'FI'!");//读到done可以安全退出
 }
-//@铁男 代码逻辑问题
 //ParseIfExpr - 实现If判断
 static std::unique_ptr<ExprAST> ParseIfExpr() {	
 	std::unique_ptr<ExprAST> Cond, ThenStat, ElseStat;
