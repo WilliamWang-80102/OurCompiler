@@ -505,11 +505,8 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 }
 //处理IF和WHILE后面的条件语句
 static std::unique_ptr<ExprAST> ParseConditionExpr() {
-	std::unique_ptr<ExprAST> Cond;
-	CurTok = getNextToken();
-	if (CurTok = '(') return ParseParenExpr();
-	else if ((CurTok = tok_number) || (CurTok = tok_var)) return Cond;
-	else return LogError("Not A Condition Expression!");
+	getNextToken();
+	std::unique_ptr<ExprAST> Cond = ParseExpression();
 }
 //ParseWhileExpr - 实现While循环
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
