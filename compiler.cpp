@@ -9,6 +9,21 @@
 #include <string>
 #include <vector>
 
+#define NUM_EXPR "NumberExpression"
+#define VAR_EXPR "VariableExpression"
+#define DCL_EXPR "DeclarationExpression"
+#define ASG_EXPR "AssignmentExpression"
+#define BIN_EXPR "BinaryExpression"
+#define CAL_EXPR "CallExpression"
+#define PRT_EXPR "FunctionPrototype"
+#define FNC_EXPR "FunctionDefinition"
+#define BLK_EXPR "BlockExpression"
+#define RET_EXPR "ReturnExpression"
+#define PRT_EXPR "PrintExpression"
+#define CNT_EXPR "ContinueExpression"
+#define IF_EXPR "IfExpression"
+#define WHILE_EXPR "WhileExpression"
+
 //===----------------------------------------------------------------------===//
 // Lexer
 //===----------------------------------------------------------------------===//
@@ -149,7 +164,6 @@ namespace {
 	class ExprAST {
 	public:
 		virtual ~ExprAST() = default;
-		virtual void printAST() = 0;
 	};
 
 	/// NumberExprAST - Expression class for numeric literals like "1.0".
@@ -158,9 +172,6 @@ namespace {
 
 	public:
 		NumberExprAST(double Val) : Val(Val) {}
-		virtual void printAST() {
-			//输出数字常量结点
-		};
 	};
 
 	/// VariableExprAST - Expression class for referencing a variable, like "a".
@@ -169,9 +180,6 @@ namespace {
 
 	public:
 		VariableExprAST(const std::string &Name) : Name(Name) {}
-		virtual void printAST() {
-			//输出变量结点
-		}
 	};
 
 	/// DeclareExprAST - Expression like 'VAR x,y,z'.
@@ -179,9 +187,6 @@ namespace {
 		std::vector<std::string> Names;
 	public:
 		DeclareExprAST(const std::vector<std::string> &Names) : Names(Names) {}
-		virtual void printAST() {
-			//输出声明表达式结点
-		}
 	};
 
 	/// AssignExpr - 负责处理赋值表达式
@@ -191,9 +196,6 @@ namespace {
 	public:
 		AssignExpr(std::string Ident, std::unique_ptr<ExprAST> Expr)
 		:Ident(Ident),Expr(std::move(Expr)){}
-		virtual void printAST() {
-			//输出赋值表达式结点
-		}
 	};
 
 	/// BinaryExprAST - Expression class for a binary operator.
@@ -205,9 +207,6 @@ namespace {
 		BinaryExprAST(char Op, std::unique_ptr<ExprAST> LHS,
 			std::unique_ptr<ExprAST> RHS)
 			: Op(Op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
-		virtual void printAST() {
-			//输出运算表达式结点
-		}
 	};
 
 	/// CallExprAST - Expression class for function calls.
@@ -219,9 +218,7 @@ namespace {
 		CallExprAST(const std::string &Callee,
 			std::vector<std::unique_ptr<ExprAST>> Args)
 			: Callee(Callee), Args(std::move(Args)) {}
-		virtual void printAST() {
-			//输出函数调用表达式结点
-		}
+		
 	};
 	
 	/// PrototypeAST - This class represents the "prototype" for a function,
@@ -236,9 +233,6 @@ namespace {
 			: Name(Name), Args(std::move(Args)) {}
 
 		const std::string &getName() const { return Name; }
-		virtual void printAST() {
-			//输出函数签名结点
-		}
 	};
 
 	/// FunctionAST - This class represents a function definition itself.
@@ -251,9 +245,6 @@ namespace {
 		FunctionAST(std::unique_ptr<PrototypeAST> Proto,
 			std::unique_ptr<ExprAST> Body)
 			: Proto(std::move(Proto)), Body(std::move(Body)) {}
-		virtual void printAST() {
-			//输出函数定义结点
-		}
 	};
 	
 	///ExprsAST - 语句块表达式结点
@@ -262,9 +253,6 @@ namespace {
 	public:
 		ExprsAST(std::vector<std::unique_ptr<ExprAST>> Stats)
 			:Stats(std::move(Stats)) {}
-		virtual void printAST() {
-			//输出语句块结点
-		}
 	};
 	
 	///RetStatAST - 返回语句结点
@@ -272,9 +260,6 @@ namespace {
 		std::unique_ptr<ExprAST> Expr; // 返回语句后面的表达式
 	public:
 		RetStatAST(std::unique_ptr<ExprAST> Expr) : Expr(std::move(Expr)) {}
-		virtual void printAST() {
-			//输出返回表达式结点
-		}
 	};
 
 	/// PrtStatAST - 打印语句结点
@@ -283,18 +268,12 @@ namespace {
 		std::vector<std::unique_ptr<ExprAST>> Args;
 	public:
 		PrtStatAST(std::vector<std::unique_ptr<ExprAST>> Args) : Args(std::move(Args)) {}
-		virtual void printAST() {
-			//输出打印表达式结点
-		}
 	};
 
 	/// NullStatAST - 空语句结点
 	class NullStatAST : public ExprAST {
 	public:
 		NullStatAST() {}
-		virtual void printAST() {
-			//输出Continue语句结点
-		}
 	};
 
 	/// IfStatAST - 条件语句结点
@@ -310,9 +289,6 @@ namespace {
 			:Cond(std::move(Cond)),
 			ThenStat(std::move(ThenStat)),
 			ElseStat(std::move(ElseStat)) {}
-		virtual void printAST() {
-			//输出条件语句结点
-		}
 	};
 
 	/// WhileStatAST - 当循环语句结点
@@ -323,9 +299,6 @@ namespace {
 		WhileStatAST(std::unique_ptr<ExprAST> Cond,
 			std::unique_ptr<ExprAST> Stat)
 			:Cond(std::move(Cond)), Stat(std::move(Stat)) {}
-		virtual void printAST() {
-			//输出当循环语句结点
-		}
 	};
 
 } // end anonymous namespace
