@@ -462,22 +462,10 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 //ParseReturnExpr - 实现返回语句
 static std::unique_ptr<ExprAST> ParseReturnExpr()
 {
-<<<<<<< HEAD
-	if (CurTok == tok_return)
-	{
-		getNextToken();
-		std::unique_ptr<ExprAST> Expr = ParseExpression();
-		if (Expr)
-		{
-			//auto Result = new RetStatAST(std::move(Expr));
-			return llvm::make_unique<RetStatAST>(std::move(Expr));
-		}
-=======
 	getNextToken();
 	std::unique_ptr<ExprAST> Expr = ParseExpression();
 	if (Expr) {
 		return llvm::make_unique<RetStatAST>(std::move(Expr));
->>>>>>> 2e8324c2cfd963db29dee17bbdd2636d7a0d4991
 	}
 	else LogError("Expected return value!");
 }
@@ -490,24 +478,6 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 	getNextToken();
 	while (CurTok != '#')
 	{
-<<<<<<< HEAD
-		//滤去PRINT
-		getNextToken();
-		while (getNextToken() != '#')
-		{
-			if (CurTok == '"')
-			{
-				Args.push_back(ParseString());
-			}
-			if (CurTok == tok_number)
-			{
-				Args.push_back(ParseNumberExpr());
-			}
-			if (CurTok == tok_identifier)
-			{
-				Args.push_back(ParsePrimary());
-			
-=======
 		if (CurTok == '"')
 		{
 			getNextToken();
@@ -515,21 +485,14 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 			{
 				//getPrintString()函数用于获取双引号之间的内容
 				Args.push_back(ParseExpression());
->>>>>>> 2e8324c2cfd963db29dee17bbdd2636d7a0d4991
 			}
 			getNextToken();
 		}
-<<<<<<< HEAD
-		if (CurTok == '#')
-		{
-			return llvm::make_unique<PrtStatAST>(std::move(Args));
-=======
 		if (CurTok != ',') {
 			auto E = ParseExpression();
 			if (E) {
 				Args.push_back(std::move(E));
 			}
->>>>>>> 2e8324c2cfd963db29dee17bbdd2636d7a0d4991
 		}
 		else getNextToken();
 	}
@@ -734,7 +697,6 @@ static std::unique_ptr<PrototypeAST> ParseExtern() {
 /// ParseStats - 分析语句块的函数
 static std::unique_ptr<ExprsAST> ParseStats() {
 	std::vector<std::unique_ptr<ExprAST>> Stats;
-	getNextToken();
 	if (CurTok != '{') {
 		Stats.push_back(std::move(ParseStat()));
 		return llvm::make_unique<ExprsAST>(std::move(Stats));
