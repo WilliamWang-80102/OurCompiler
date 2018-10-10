@@ -33,7 +33,7 @@ enum Token {
 	//return
 	tok_return = -6,
 	//print
-	
+
 	tok_print = -7,
 	//在这里补充VSL的关键字FUNC等....
 	tok_continue = -8,
@@ -96,28 +96,28 @@ static int gettok() {
 	//此处应修改，避免出现1.2.3仍能通过的情况，修改后请删去本行
 	if (isdigit(LastChar) || LastChar == '.') { // 数字
 		std::string NumStr;
-		int num_point=0;
-			do {
-				if (LastChar == '.')
-					num_point++;
-				NumStr += LastChar;
-				LastChar = getchar();
-			} while (isdigit(LastChar) || LastChar == '.');
-			if (num_point < 2) {
-				NumVal = strtod(NumStr.c_str(), nullptr);
-				return tok_number;
-			}
-			else {
-				fprintf(stderr,"Invalid demical");
-				return 0;
-			}
+		int num_point = 0;
+		do {
+			if (LastChar == '.')
+				num_point++;
+			NumStr += LastChar;
+			LastChar = getchar();
+		} while (isdigit(LastChar) || LastChar == '.');
+		if (num_point < 2) {
+			NumVal = strtod(NumStr.c_str(), nullptr);
+			return tok_number;
+		}
+		else {
+			fprintf(stderr, "Invalid demical");
+			return 0;
+		}
 	}
 
 	//此处修改对注释的处理，不再是'#'，而是"//"
 	//对注释的处理已修改为"//"
 	if (LastChar == '/') {
 		//如果是除法，返回该除法符号
-		if ((LastChar = getchar()) != '/') 
+		if ((LastChar = getchar()) != '/')
 			return '/';
 
 		// Comment until end of line.
@@ -189,7 +189,7 @@ namespace {
 		std::unique_ptr<ExprAST> Expr;
 	public:
 		AssignExpr(std::string Ident, std::unique_ptr<ExprAST> Expr)
-		:Ident(Ident),Expr(std::move(Expr)){}
+			:Ident(Ident), Expr(std::move(Expr)) {}
 		virtual void printAST() {
 			//输出赋值表达式结点
 		}
@@ -222,7 +222,7 @@ namespace {
 			//输出函数调用表达式结点
 		}
 	};
-	
+
 	/// PrototypeAST - This class represents the "prototype" for a function,
 	/// which captures its name, and its argument names (thus implicitly the number
 	/// of arguments the function takes).
@@ -254,7 +254,7 @@ namespace {
 			//输出函数定义结点
 		}
 	};
-	
+
 	///ExprsAST - 语句块表达式结点
 	class ExprsAST : public ExprAST {
 		std::vector<std::unique_ptr<ExprAST>> Stats; //多句表达式向量
@@ -265,7 +265,7 @@ namespace {
 			//输出语句块结点
 		}
 	};
-	
+
 	///RetStatAST - 返回语句结点
 	class RetStatAST : public ExprAST {
 		std::unique_ptr<ExprAST> Expr; // 返回语句后面的表达式
@@ -431,7 +431,7 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 			if (RHS) {
 				fprintf(stderr, "Parsed an assignment statement");
 				return llvm::make_unique<AssignExpr>(IdName, std::move(RHS));
-			}				
+			}
 		}
 		else LogError("Expected '='");
 	}
@@ -468,56 +468,40 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
 {
 	getNextToken();
 	std::unique_ptr<ExprAST> Expr = ParseExpression();
-	if (!Expr) {
-		//auto Result = new RetStatAST(std::move(Expr));
-		//auto Result = llvm::make_unique<RetStatAST>(std::move(Expr));
-		//return Result;
+	if (Expr) {
 		return llvm::make_unique<RetStatAST>(std::move(Expr));
 	}
-	
+	else LogError("Expected return value!");
 }
 
 //ParsePrintExpr - 实现打印语句
 static std::unique_ptr<ExprAST> ParsePrintExpr()
 {
 	std::vector <std::unique_ptr<ExprAST>> Args;
-		//滤去PRINT
-		getNextToken();
-		while (getNextToken() != '#')
+	//滤去PRINT
+	getNextToken();
+	while (CurTok != '#')
+	{
+		if (CurTok == '"')
 		{
-			if (CurTok == '"')
+			getNextToken();
+			while (CurTok != '"')
 			{
-				while (getNextToken() != '"')
-				{
-					//getPrintString()函数用于获取双引号之间的内容
-					Args.push_back(ParseExpression());
-				}
-				getNextToken();
+				//getPrintString()函数用于获取双引号之间的内容
+				Args.push_back(ParseExpression());
 			}
-			/*
-			if (CurTok == tok_number)
-			{
-				Args.push_back(ParseNumberExpr());
-				getNextToken();
-			}
-			if (CurTok == tok_identifier)
-			{
-				Args.push_back(ParsePrimary());
-				getNextToken();
-			}
-			*/
-			if (CurTok != ',') {
-				if (ParseExpression()) {
-					Args.push_back(ParseExpression());
-				}
+			getNextToken();
+		}
+		if (CurTok != ',') {
+			auto E = ParseExpression();
+			if (E) {
+				Args.push_back(std::move(E));
 			}
 		}
-	
-	if (CurTok == '#') 
-	{
-		auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
-		return Result;
+		else getNextToken();
 	}
+	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
+	return Result;
 }
 //@铁男 代码逻辑问题
 //ParseWhileExpr - 实现While循环
@@ -537,19 +521,19 @@ static std::unique_ptr<ExprAST> ParseWhileExpr() {
 		}
 
 	}
-		else return LogError("Expect 'then'!");
-		CurTok = getNextToken();
-		if (CurTok == tok_done) return WhilePtr;
-		else return LogError("Expect 'FI'!");//读到done可以安全退出
+	else return LogError("Expect 'then'!");
+	CurTok = getNextToken();
+	if (CurTok == tok_done) return WhilePtr;
+	else return LogError("Expect 'FI'!");//读到done可以安全退出
 }
 //@铁男 代码逻辑问题
 //ParseIfExpr - 实现If判断
-static std::unique_ptr<ExprAST> ParseIfExpr() {	
+static std::unique_ptr<ExprAST> ParseIfExpr() {
 	std::unique_ptr<ExprAST> Cond, ThenStat, ElseStat;
 	std::unique_ptr<IfStatAST> IfPtr = llvm::make_unique<IfStatAST>(std::move(Cond), std::move(ThenStat), std::move(ElseStat));
 	ParseParenExpr(); //分析if后面的条件
 	getNextToken();
-	if (CurTok == tok_then ) {
+	if (CurTok == tok_then) {
 		getNextToken();
 		switch (CurTok) {
 		case tok_identifier:
@@ -560,9 +544,9 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
 		}
 	}
 	else return LogError("Expect 'DO'!");
-		CurTok = getNextToken();
-		if (CurTok == tok_fi) return IfPtr;
-		else return LogError("Expect 'DONE'!");//读到fi可以安全退出
+	CurTok = getNextToken();
+	if (CurTok == tok_fi) return IfPtr;
+	else return LogError("Expect 'DONE'!");//读到fi可以安全退出
 }
 
 //ParseDclrExpr - 实现变量声明语句解析
@@ -684,7 +668,7 @@ static std::unique_ptr<FunctionAST> ParseDefinition() {
 	auto Proto = ParsePrototype();
 	if (!Proto)
 		return nullptr;
-	
+
 	//此处改为分析函数体的语句
 	if (auto E = ParseStats())
 		return llvm::make_unique<FunctionAST>(std::move(Proto), std::move(E));
@@ -931,7 +915,7 @@ static void MainLoop() {
 			return;
 		case '#':
 			return;
-		//非函数体报错
+			//非函数体报错
 		default:
 			LogError("Error!Expected a function definition");
 			getNextToken();
@@ -944,7 +928,7 @@ static void MainLoop() {
 //===----------------------------------------------------------------------===//
 
 static std::unique_ptr<ExprAST> ParseProgram() {
-	
+
 	//存储程序中的所有函数或其它语句
 	std::vector<std::unique_ptr<ExprAST>> func_list;
 	while (true) {
@@ -977,7 +961,7 @@ int main() {
 	// Prime the first token.
 	fprintf(stderr, "ready> ");
 	getNextToken();
-	
+
 
 	// Run the main "interpreter loop" now.
 	MainLoop();
