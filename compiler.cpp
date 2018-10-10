@@ -149,7 +149,7 @@ namespace {
 	class ExprAST {
 	public:
 		virtual ~ExprAST() = default;
-		virtual void printAST() = 0;
+		virtual void printAST() {};
 	};
 
 	/// NumberExprAST - Expression class for numeric literals like "1.0".
@@ -160,6 +160,17 @@ namespace {
 		NumberExprAST(double Val) : Val(Val) {}
 		virtual void printAST() {
 			//输出数字常量结点
+		};
+	};
+
+	///StringAST
+	class StringAST : public ExprAST {
+		std::string str;
+
+	public:
+		StringAST(std::string str) : str(str) {}
+		virtual void printAST() {
+			//输出字符串结点
 		};
 	};
 
@@ -383,7 +394,20 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr();
 static std::unique_ptr<PrototypeAST> ParseExtern();
 static std::unique_ptr<ExprsAST> ParseStats();
 static std::unique_ptr<ExprAST> ParseStat();
+static std::unique_ptr<ExprAST> ParseString();
 
+///print语句中字符串节点
+static std::unique_ptr<ExprAST> ParseString()
+{
+	std::string str = "";
+	char c;
+	while ((c = getchar()) != '"') 
+	{
+		str += c;
+	}
+    auto Result = llvm::make_unique<StringAST>(str);
+	return std::move(Result);
+}
 
 /// numberexpr ::= number
 static std::unique_ptr<ExprAST> ParseNumberExpr() {
@@ -471,7 +495,8 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
 	{
 		getNextToken();
 		std::unique_ptr<ExprAST> Expr = ParseExpression();
-		if (!Expr) {
+		if (Expr)
+		{
 			//auto Result = new RetStatAST(std::move(Expr));
 			return llvm::make_unique<RetStatAST>(std::move(Expr));
 		}
@@ -486,29 +511,23 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 	{
 		//滤去PRINT
 		getNextToken();
-		while (getNextToken() != '\n')
+		while (getNextToken() != '#')
 		{
 			if (CurTok == '"')
 			{
-				while (getNextToken() != '"')
-				{
-					//getPrintString()函数用于获取双引号之间的内容
-					Args.push_back(ParseExpression());
-				}
-				getNextToken();
+				Args.push_back(ParseString());
 			}
 			if (CurTok == tok_number)
 			{
 				Args.push_back(ParseNumberExpr());
-				getNextToken();
 			}
 			if (CurTok == tok_identifier)
 			{
 				Args.push_back(ParsePrimary());
-				getNextToken();
+			
 			}
 		}
-		if (CurTok == '\n')
+		if (CurTok == '#')
 		{
 			return llvm::make_unique<PrtStatAST>(std::move(Args));
 		}
