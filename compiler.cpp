@@ -173,6 +173,17 @@ namespace {
 		NumberExprAST(double Val) : Val(Val) {}
 	};
 
+	///StringAST
+	class StringAST : public ExprAST {
+		std::string str;
+
+	public:
+		StringAST(std::string str) : str(str) {}
+		virtual void printAST() {
+			//输出字符串结点
+		};
+	};
+
 	/// VariableExprAST - Expression class for referencing a variable, like "a".
 	class VariableExprAST : public ExprAST {
 		std::string Name;
@@ -354,7 +365,20 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr();
 static std::unique_ptr<PrototypeAST> ParseExtern();
 static std::unique_ptr<ExprsAST> ParseStats();
 static std::unique_ptr<ExprAST> ParseStat();
+static std::unique_ptr<ExprAST> ParseString();
 
+///print语句中字符串节点
+static std::unique_ptr<ExprAST> ParseString()
+{
+	std::string str = "";
+	char c;
+	while ((c = getchar()) != '"') 
+	{
+		str += c;
+	}
+    auto Result = llvm::make_unique<StringAST>(str);
+	return std::move(Result);
+}
 
 /// numberexpr ::= number
 static std::unique_ptr<ExprAST> ParseNumberExpr() {
@@ -438,10 +462,22 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 //ParseReturnExpr - 实现返回语句
 static std::unique_ptr<ExprAST> ParseReturnExpr()
 {
+<<<<<<< HEAD
+	if (CurTok == tok_return)
+	{
+		getNextToken();
+		std::unique_ptr<ExprAST> Expr = ParseExpression();
+		if (Expr)
+		{
+			//auto Result = new RetStatAST(std::move(Expr));
+			return llvm::make_unique<RetStatAST>(std::move(Expr));
+		}
+=======
 	getNextToken();
 	std::unique_ptr<ExprAST> Expr = ParseExpression();
 	if (Expr) {
 		return llvm::make_unique<RetStatAST>(std::move(Expr));
+>>>>>>> 2e8324c2cfd963db29dee17bbdd2636d7a0d4991
 	}
 	else LogError("Expected return value!");
 }
@@ -454,6 +490,24 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 	getNextToken();
 	while (CurTok != '#')
 	{
+<<<<<<< HEAD
+		//滤去PRINT
+		getNextToken();
+		while (getNextToken() != '#')
+		{
+			if (CurTok == '"')
+			{
+				Args.push_back(ParseString());
+			}
+			if (CurTok == tok_number)
+			{
+				Args.push_back(ParseNumberExpr());
+			}
+			if (CurTok == tok_identifier)
+			{
+				Args.push_back(ParsePrimary());
+			
+=======
 		if (CurTok == '"')
 		{
 			getNextToken();
@@ -461,14 +515,21 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 			{
 				//getPrintString()函数用于获取双引号之间的内容
 				Args.push_back(ParseExpression());
+>>>>>>> 2e8324c2cfd963db29dee17bbdd2636d7a0d4991
 			}
 			getNextToken();
 		}
+<<<<<<< HEAD
+		if (CurTok == '#')
+		{
+			return llvm::make_unique<PrtStatAST>(std::move(Args));
+=======
 		if (CurTok != ',') {
 			auto E = ParseExpression();
 			if (E) {
 				Args.push_back(std::move(E));
 			}
+>>>>>>> 2e8324c2cfd963db29dee17bbdd2636d7a0d4991
 		}
 		else getNextToken();
 	}
