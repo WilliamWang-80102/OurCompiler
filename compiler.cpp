@@ -505,7 +505,7 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 static std::unique_ptr<ExprAST> ParseConditionExpr() {
 	std::unique_ptr<ExprAST> Cond = ParseExpression();
 	if (Cond) {
-		return Cond;
+		return std::move(Cond);
 	}
 	else return LogError("Expected condition statement!");
 }
@@ -513,8 +513,8 @@ static std::unique_ptr<ExprAST> ParseConditionExpr() {
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
 	getNextToken();//eat WHILE
 	std::unique_ptr<ExprAST> Cond, Stat;
-	std::unique_ptr<WhileStatAST> WhilePtr = llvm::make_unique<WhileStatAST>(std::move(Cond), std::move(Stat));
-	ParseConditionExpr();
+	std::unique_ptr<WhileStatAST> WhilePtr;
+	Cond = ParseConditionExpr();
 	if (CurTok == tok_do) {
 		getNextToken();//eat DO
 		Stat = ParseStats();
@@ -524,6 +524,7 @@ static std::unique_ptr<ExprAST> ParseWhileExpr() {
 	else return LogError("Expect 'DO'!");
 	if (CurTok == tok_done) {
 		getNextToken();//eat DONE
+		WhilePtr = llvm::make_unique<WhileStatAST>(std::move(Cond), std::move(Stat));
 		return WhilePtr;
 	}
 	else return LogError("Expect 'DONE'!");//读到done可以安全退出
@@ -532,8 +533,8 @@ static std::unique_ptr<ExprAST> ParseWhileExpr() {
 static std::unique_ptr<ExprAST> ParseIfExpr() {
 	getNextToken();//eat IF
 	std::unique_ptr<ExprAST> Cond, ThenStat, ElseStat;
-	std::unique_ptr<IfStatAST> IfPtr = llvm::make_unique<IfStatAST>(std::move(Cond), std::move(ThenStat), std::move(ElseStat));
-	ParseConditionExpr(); //分析if后面的条件
+	std::unique_ptr<IfStatAST> IfPtr;
+	Cond = ParseConditionExpr(); //分析if后面的条件
 	if (CurTok == tok_then) {
 		getNextToken();//eat THEN
 		ThenStat = ParseStats();
@@ -542,6 +543,7 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
 	else return LogError("Expect 'THEN'!");
 	if (CurTok == tok_fi) {
 		getNextToken();//eat FI
+		IfPtr = llvm::make_unique<IfStatAST>(std::move(Cond), std::move(ThenStat), std::move(ElseStat));
 		return IfPtr;
 	}
 	else if (CurTok == tok_else) {
@@ -550,12 +552,14 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
 		if (ElseStat) {
 			if (CurTok == tok_fi) {
 				getNextToken();//eat FI
+				IfPtr = llvm::make_unique<IfStatAST>(std::move(Cond), std::move(ThenStat), std::move(ElseStat));
 				return IfPtr;
 			}
 			else return LogError("Expect 'FI'!");
 		}
 		else return LogError("Expect 'ELSE' statements!");
 	}
+	return nullptr;
 }
 
 //ParseDclrExpr - 实现变量声明语句解析
@@ -734,7 +738,10 @@ static std::unique_ptr<ExprAST> ParseStat() {
 
 		//IDENTI
 	case tok_identifier:
-		return ParseIdentifierExpr();
+		return ParseExpression();
+
+	case tok_number:
+		return ParseExpression();
 
 		//RETURN
 	case tok_return:
