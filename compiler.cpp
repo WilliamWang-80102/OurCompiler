@@ -889,7 +889,6 @@ static void MainLoop() {
 */
 static void MainLoop() {
 	while (true) {
-		fprintf(stderr, "ready> ");
 		switch (CurTok) {
 		case tok_func:
 			HandleDefinition();
@@ -915,14 +914,19 @@ static void MainLoop() {
 		case tok_eof:
 			return;
 		case '#':
-			return;
+			fprintf(stderr, "ready> ");
+			getNextToken();
+			break;
 			//非函数体报错
 		default:
 			LogError("Error!Expected a function definition");
+			fprintf(stderr, "ready> ");
 			getNextToken();
 			break;
 		}
+		
 	}
+	
 }
 //===----------------------------------------------------------------------===//
 // Program Parse Code
