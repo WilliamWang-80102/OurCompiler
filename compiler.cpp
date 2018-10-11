@@ -163,6 +163,8 @@ namespace {
 	class ExprAST {
 	public:
 		virtual ~ExprAST() = default;
+		virtual void printAST() {
+		};
 	};
 
 	/// NumberExprAST - Expression class for numeric literals like "1.0".
@@ -372,11 +374,11 @@ static std::unique_ptr<ExprAST> ParseString()
 {
 	std::string str = "";
 	char c;
-	while ((c = getchar()) != '"') 
+	while ((c = getchar()) != '"')
 	{
 		str += c;
 	}
-    auto Result = llvm::make_unique<StringAST>(str);
+	auto Result = llvm::make_unique<StringAST>(str);
 	return std::move(Result);
 }
 
@@ -429,7 +431,7 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 				return llvm::make_unique<AssignExpr>(IdName, std::move(RHS));
 			}
 		}
-		else LogError("Expected '='");
+		else return LogError("Expected '='");
 	}
 	if (CurTok != '(') // Simple variable ref.
 		return llvm::make_unique<VariableExprAST>(IdName);
@@ -462,12 +464,12 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 //ParseReturnExpr - 实现返回语句
 static std::unique_ptr<ExprAST> ParseReturnExpr()
 {
-	getNextToken();
+	getNextToken();//eat RETURN
 	std::unique_ptr<ExprAST> Expr = ParseExpression();
 	if (Expr) {
 		return llvm::make_unique<RetStatAST>(std::move(Expr));
 	}
-	else LogError("Expected return value!");
+	else return LogError("Expected return value!");
 }
 
 //ParsePrintExpr - 实现打印语句
@@ -501,54 +503,59 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 }
 //处理IF和WHILE后面的条件语句
 static std::unique_ptr<ExprAST> ParseConditionExpr() {
-	std::unique_ptr<ExprAST> Cond;
-	CurTok = getNextToken();
-	if (CurTok = '(') return ParseParenExpr();
-	else if ((CurTok = tok_number) || (CurTok = tok_var)) return Cond;
-	else return LogError("Not A Condition Expression!");
+	std::unique_ptr<ExprAST> Cond = ParseExpression();
+	if (Cond) {
+		return Cond;
+	}
+	else return LogError("Expected condition statement!");
 }
 //ParseWhileExpr - 实现While循环
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
+	getNextToken();//eat WHILE
 	std::unique_ptr<ExprAST> Cond, Stat;
 	std::unique_ptr<WhileStatAST> WhilePtr = llvm::make_unique<WhileStatAST>(std::move(Cond), std::move(Stat));
 	ParseConditionExpr();
-	CurTok = getNextToken();
 	if (CurTok == tok_do) {
-		CurTok = getNextToken();
-		switch (CurTok) {
-		case tok_identifier:
-		case tok_if:
-		case tok_while:ParseStat(); break;
-		case '{':ParseStats(); break;
-		default:return LogError("Not A WHile Parser!"); break;
-		}
-
+		getNextToken();//eat DO
+		Stat = ParseStats();
+		if (!Stat) return LogError("Expect 'DO' statements!");
+		//return LogError("Not A WHILE Parser!");
 	}
-	else return LogError("Expect 'then'!");
-	CurTok = getNextToken();
-	if (CurTok == tok_done) return WhilePtr;
-	else return LogError("Expect 'FI'!");//读到done可以安全退出
+	else return LogError("Expect 'DO'!");
+	if (CurTok == tok_done) {
+		getNextToken();//eat DONE
+		return WhilePtr;
+	}
+	else return LogError("Expect 'DONE'!");//读到done可以安全退出
 }
 //ParseIfExpr - 实现If判断
 static std::unique_ptr<ExprAST> ParseIfExpr() {
+	getNextToken();//eat IF
 	std::unique_ptr<ExprAST> Cond, ThenStat, ElseStat;
 	std::unique_ptr<IfStatAST> IfPtr = llvm::make_unique<IfStatAST>(std::move(Cond), std::move(ThenStat), std::move(ElseStat));
 	ParseConditionExpr(); //分析if后面的条件
-	getNextToken();
 	if (CurTok == tok_then) {
-		getNextToken();
-		switch (CurTok) {
-		case tok_identifier:
-		case tok_if:
-		case tok_while:ParseStat(); break;
-		case '{':ParseStats(); break;
-		default:return LogError("Not A If Parser!"); break;
-		}
+		getNextToken();//eat THEN
+		ThenStat = ParseStats();
+		if (!ThenStat) return LogError("Expect 'THEN' statements!");
 	}
-	else return LogError("Expect 'DO'!");
-	CurTok = getNextToken();
-	if (CurTok == tok_fi) return IfPtr;
-	else return LogError("Expect 'DONE'!");//读到fi可以安全退出
+	else return LogError("Expect 'THEN'!");
+	if (CurTok == tok_fi) {
+		getNextToken();//eat FI
+		return IfPtr;
+	}
+	else if (CurTok == tok_else) {
+		getNextToken();//eat ELSE
+		ElseStat = ParseStats();
+		if (ElseStat) {
+			if (CurTok == tok_fi) {
+				getNextToken();//eat FI
+				return IfPtr;
+			}
+			else return LogError("Expect 'FI'!");
+		}
+		else return LogError("Expect 'ELSE' statements!");
+	}
 }
 
 //ParseDclrExpr - 实现变量声明语句解析
@@ -560,12 +567,8 @@ static std::unique_ptr<ExprAST> ParseDclrExpr() {
 		getNextToken();
 		if (CurTok == ',') getNextToken();//eat ','
 	}
-	if (Names.empty()) {
-		LogError("Need var names");
-		return nullptr;
-	}
-	else
-		return llvm::make_unique<DeclareExprAST>(std::move(Names));
+	if (Names.empty()) return LogError("Need var names");
+	else return llvm::make_unique<DeclareExprAST>(std::move(Names));
 }
 
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
@@ -696,6 +699,7 @@ static std::unique_ptr<PrototypeAST> ParseExtern() {
 
 /// ParseStats - 分析语句块的函数
 static std::unique_ptr<ExprsAST> ParseStats() {
+	//getNextToken();
 	std::vector<std::unique_ptr<ExprAST>> Stats;
 	if (CurTok != '{') {
 		Stats.push_back(std::move(ParseStat()));
@@ -703,7 +707,8 @@ static std::unique_ptr<ExprsAST> ParseStats() {
 	}
 	else {
 		//仅考虑正常语法情况，需增加异常处理
-		while (getNextToken() != '}') {
+		getNextToken();
+		while (CurTok != '}') {
 			Stats.push_back(std::move(ParseStat()));
 		}
 		//消耗掉'}'
