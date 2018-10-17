@@ -8,6 +8,11 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "llvm/IR/Module.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+using namespace llvm;
+
 
 #define NUM_EXPR "NumberExpression"
 #define VAR_EXPR "VariableExpression"
@@ -163,6 +168,7 @@ namespace {
 	class ExprAST {
 	public:
 		virtual ~ExprAST() = default;
+		virtual Value *Codegen();
 		virtual void printAST() {
 		};
 	};
@@ -181,6 +187,7 @@ namespace {
 
 	public:
 		StringAST(std::string str) : str(str) {}
+		virtual Value *Codegen();
 		virtual void printAST() {
 			//输出字符串结点
 		};
@@ -271,6 +278,7 @@ namespace {
 		std::unique_ptr<ExprAST> Expr; // 返回语句后面的表达式
 	public:
 		RetStatAST(std::unique_ptr<ExprAST> Expr) : Expr(std::move(Expr)) {}
+		virtual Value *Codegen();
 	};
 
 	/// PrtStatAST - 打印语句结点
@@ -279,6 +287,7 @@ namespace {
 		std::vector<std::unique_ptr<ExprAST>> Args;
 	public:
 		PrtStatAST(std::vector<std::unique_ptr<ExprAST>> Args) : Args(std::move(Args)) {}
+		virtual Value *Codegen();
 	};
 
 	/// NullStatAST - 空语句结点
@@ -965,6 +974,35 @@ static std::unique_ptr<ExprAST> ParseProgram() {
 //===----------------------------------------------------------------------===//
 // Main driver code.
 //===----------------------------------------------------------------------===//
+
+
+static llvm::LLVMContext TheContext;
+static Module *TheModule;
+static llvm::IRBuilder<> Builder(TheContext);
+static std::map<std::string, Value*> NamedValues;
+
+
+//返回语句代码生成codegen()
+Value *RetStatAST::Codegen() 
+{
+	std::unique_ptr<ExprAST> Expr;
+	Value *RetValue = Expr->Codegen();
+	return Builder.CreateRet(RetValue);
+}
+
+
+//打印语句代码生成codegen()
+Value *PrtStatAST::Codegen() 
+{
+	std::vector <std::unique_ptr<ExprAST>> Args;
+	std::vector<Value *> ArgsP;
+	for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+		ArgsP.push_back(Args[i]->Codegen());
+	}
+	//TheModule = llvm::make_unique<llvm::Module>(ArgsP, TheContext);
+	//TheModule->dump();
+}
+
 
 int main() {
 	// Install standard binary operators.
