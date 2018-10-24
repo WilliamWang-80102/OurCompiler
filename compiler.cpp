@@ -18,6 +18,11 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "llvm/IR/Module.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+using namespace llvm;
+
 
 #define NUM_EXPR "NumberExpression"
 #define VAR_EXPR "VariableExpression"
@@ -200,6 +205,7 @@ namespace {
 
 	public:
 		StringAST(std::string str) : str(str) {}
+		virtual Value *Codegen();
 		virtual void printAST() {
 			//输出字符串结点
 		};
@@ -1110,6 +1116,40 @@ static std::unique_ptr<FunctionAST> ParseProgram() {
 //===----------------------------------------------------------------------===//
 // Main driver code.
 //===----------------------------------------------------------------------===//
+
+
+static llvm::LLVMContext TheContext;
+static Module *TheModule;
+static llvm::IRBuilder<> Builder(TheContext);
+static std::map<std::string, Value*> NamedValues;
+
+
+//string的代码生成
+Value *StringAST::Codegen()
+{
+	Value *V = NamedValues[str];
+	return V;
+}
+
+
+//返回语句代码生成codegen()
+Value *RetStatAST::Codegen() 
+{
+	Value *RetValue = Expr->Codegen();
+	return Builder.CreateRet(RetValue);
+}
+
+
+//打印语句代码生成codegen()
+Value *PrtStatAST::Codegen() 
+{
+	std::vector<Value *> ArgsP;
+	for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+		ArgsP.push_back(Args[i]->Codegen());
+	}
+	//return Builder.CreatePrt(ArgsP);
+}
+
 
 int main() {
 	// Install standard binary operators.
