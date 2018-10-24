@@ -982,10 +982,17 @@ static llvm::IRBuilder<> Builder(TheContext);
 static std::map<std::string, Value*> NamedValues;
 
 
+//string的代码生成
+Value *StringAST::Codegen()
+{
+	Value *V = NamedValues[str];
+	return V;
+}
+
+
 //返回语句代码生成codegen()
 Value *RetStatAST::Codegen() 
 {
-	std::unique_ptr<ExprAST> Expr;
 	Value *RetValue = Expr->Codegen();
 	return Builder.CreateRet(RetValue);
 }
@@ -994,13 +1001,11 @@ Value *RetStatAST::Codegen()
 //打印语句代码生成codegen()
 Value *PrtStatAST::Codegen() 
 {
-	std::vector <std::unique_ptr<ExprAST>> Args;
 	std::vector<Value *> ArgsP;
 	for (unsigned i = 0, e = Args.size(); i != e; ++i) {
 		ArgsP.push_back(Args[i]->Codegen());
 	}
-	//TheModule = llvm::make_unique<llvm::Module>(ArgsP, TheContext);
-	//TheModule->dump();
+	//return Builder.CreatePrt(ArgsP);
 }
 
 
