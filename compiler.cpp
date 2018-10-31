@@ -9,7 +9,6 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
-#include <iostream>
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -18,9 +17,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "llvm/IR/Module.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LLVMContext.h"
+
 using namespace llvm;
 
 
@@ -39,7 +36,6 @@ using namespace llvm;
 #define IF_EXPR "IfExpression"
 #define WHILE_EXPR "WhileExpression"
 
-using namespace llvm;
 //===----------------------------------------------------------------------===//
 // Lexer
 //===----------------------------------------------------------------------===//
@@ -972,10 +968,10 @@ static std::unique_ptr<FunctionAST> ParseProgram() {
 // Code Generation
 //===----------------------------------------------------------------------===//
 
-static llvm::LLVMContext TheContext;
-static Module *TheModule;
-static llvm::IRBuilder<> Builder(TheContext);
-static std::map<std::string, Value*> NamedValues;
+static LLVMContext TheContext;
+static IRBuilder<> Builder(TheContext);
+static std::unique_ptr<Module> TheModule;
+static std::map<std::string, Value *> NamedValues;
 
 Value *LogErrorV(const char *Str) {
 	LogError(Str);
@@ -1174,10 +1170,14 @@ int main() {
 	fprintf(stderr, "ready> ");
 	getNextToken();
 
+	// Make the module, which holds all the code.
+	TheModule = llvm::make_unique<Module>("my cool jit", TheContext);
 
 	// Run the main "interpreter loop" now.
 	MainLoop();
-	//ParseProgram();
+	
+	// Print out all of the generated code.
+	TheModule->print(errs(), nullptr);
 
 	return 0;
 }
