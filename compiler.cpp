@@ -411,7 +411,10 @@ static std::unique_ptr<ExprAST> ParseString()
 	char c;
 	while ((c = getchar()) != '"')
 	{
-		str += c;
+		if(c==';')
+			return LogError("Quotes do not come in pairs!");
+		else
+		    str += c;
 	}
 	auto Result = llvm::make_unique<StringAST>(str);
 	return std::move(Result);
@@ -513,25 +516,22 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 	std::vector <std::unique_ptr<ExprAST>> Args;
 	//滤去PRINT
 	getNextToken();
-	while (CurTok != '#')
+	while (CurTok != ';')
 	{
 		if (CurTok == '"')
 		{
-			getNextToken();
-			while (CurTok != '"')
-			{
-				//getPrintString()函数用于获取双引号之间的内容
-				Args.push_back(ParseExpression());
-			}
+		    Args.push_back(ParseString());
 			getNextToken();
 		}
-		if (CurTok != ',') {
+		else
+		{
 			auto E = ParseExpression();
-			if (E) {
-				Args.push_back(std::move(E));
-			}
+			if (E)
+				{
+					Args.push_back(std::move(E));
+					getNextToken();
+				}
 		}
-		else getNextToken();
 	}
 	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
 	return Result;
