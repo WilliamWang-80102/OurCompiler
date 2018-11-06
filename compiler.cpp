@@ -21,7 +21,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
-using namespace llvm;
+
 
 
 #define NUM_EXPR "NumberExpression"
@@ -87,14 +87,10 @@ static int gettok() {
 	static int LastChar = ' ';
 
 	// Skip any whitespace.
-	while (isspace(LastChar)){
-		/*if (LastChar == 10) {
-			LastChar = ' ';
-			return 10;
-		}*/
+	while (isspace(LastChar)) {
 		LastChar = getchar();
 	}
-		
+
 
 	if (isalpha(LastChar)) { //字母
 		IdentifierStr = LastChar;
@@ -166,10 +162,13 @@ static int gettok() {
 		if (LastChar != EOF)
 			return gettok();
 	}
+	if (LastChar == '"') {
+		LastChar = ' ';
+		return '"';
+	}
 	// Check for end of file.  Don't eat the EOF.
 	if (LastChar == EOF)
 		return tok_eof;
-
 	// Otherwise, just return the character as its ascii value.
 	int ThisChar = LastChar;
 	LastChar = getchar();
@@ -413,9 +412,11 @@ static std::unique_ptr<ExprAST> ParseString()
 {
 	std::string str = "";
 	char c;
-	while ((c = getchar()) != '"')
-	{
+	while ((c = getchar()) != '"') {
 		str += c;
+		if (c == '\n') {
+			return LogError("Expect '\"'");
+		}
 	}
 	auto Result = llvm::make_unique<StringAST>(str);
 	return std::move(Result);
@@ -505,41 +506,44 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
 {
 	getNextToken();//eat RETURN
 	std::unique_ptr<ExprAST> Expr = ParseExpression();
-	if (Expr) {
-		return llvm::make_unique<RetStatAST>(std::move(Expr));
+	if(CurTok==';'){
+		if (Expr) return llvm::make_unique<RetStatAST>(std::move(Expr));
+		else return LogError("Expect return value!");
 	}
-	else return LogError("Expect return value!");
+	else return LogError("Expect ';'");
 }
 
 //ParsePrintExpr - 实现打印语句
 static std::unique_ptr<ExprAST> ParsePrintExpr()
 {
 	std::vector <std::unique_ptr<ExprAST>> Args;
-	//滤去PRINT
-	getNextToken();
-	while (CurTok != '#')
+	while (CurTok != ';')
 	{
-		if (CurTok == '"')
-		{
-			getNextToken();
-			while (CurTok != '"')
-			{
-				//getPrintString()函数用于获取双引号之间的内容
-				Args.push_back(ParseExpression());
-			}
+		getNextToken();
+		if (CurTok == '"'){
+			//getPrintString()函数用于获取双引号之间的内容
+			Args.push_back(ParseString());
 			getNextToken();
 		}
-		if (CurTok != ',') {
+		if (CurTok == tok_identifier) {
 			auto E = ParseExpression();
 			if (E) {
 				Args.push_back(std::move(E));
 			}
+			/*else {
+				return LogError("Unexpected token");
+			}*/
 		}
-		else getNextToken();
+		if (CurTok == ';')break;
+		if (CurTok != ','&&CurTok != ';') {
+			getNextToken();
+			return LogError("Unexpected token");
+		}
 	}
 	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
 	return Result;
 }
+
 //处理IF和WHILE后面的条件语句
 static std::unique_ptr<ExprAST> ParseConditionExpr() {
 	std::unique_ptr<ExprAST> Cond = ParseExpression();
@@ -608,16 +612,17 @@ static std::unique_ptr<ExprAST> ParseDclrExpr() {
 	while (CurTok == tok_identifier) {
 		Names.push_back(IdentifierStr);
 		getNextToken();
-		if (CurTok == ',')
-			getNextToken();
-		if (CurTok != tok_identifier || CurTok == 10) {
-			LogError("Expect var names");//eat ','
-			getNextToken();
-			return nullptr;
+		if (CurTok == ','){
+			getNextToken();//eat ','
+			if (CurTok == ';') {
+				LogError("Expect var names");
+				getNextToken();//eat ';'
+				return nullptr;
+			}
 		}
 	}
-	if (Names.empty()) return LogError("Expect var names");
-	else return llvm::make_unique<DeclareExprAST>(std::move(Names));
+	if (Names.empty())  return LogError("Expect var names"); 
+	else return llvm::make_unique<DeclareExprAST>(std::move(Names)); 
 }
 
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
@@ -679,7 +684,7 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
 ///
 static std::unique_ptr<ExprAST> ParseExpression() {
 	//这里如果读到LHS为空，检查后面是否为'-'
-	std::unique_ptr<ExprAST> LHS ;
+	std::unique_ptr<ExprAST> LHS;
 	if (CurTok != '-') {
 		LHS = ParsePrimary();
 		if (!LHS)
@@ -824,6 +829,7 @@ static void HandleContinue() {
 static void HandleDeclaration() {
 	if (ParseDclrExpr()) {
 		fprintf(stderr, "Parsed a declaration statement.\n");
+		getNextToken();
 	}
 	else {
 		// Skip token for error recovery.
@@ -844,6 +850,7 @@ static void HandleDefinition() {
 static void HandleExtern() {
 	if (ParseExtern()) {
 		fprintf(stderr, "Parsed an extern\n");
+		getNextToken();
 	}
 	else {
 		// Skip token for error recovery.
@@ -885,6 +892,7 @@ static void HandleWhile() {
 static void HandlePrint() {
 	if (ParsePrintExpr()) {
 		fprintf(stderr, "Parse a print statement\n");
+		getNextToken();
 	}
 	else {
 		//Skip token for error recovery.
@@ -895,6 +903,7 @@ static void HandlePrint() {
 static void HandleReturn() {
 	if (ParseReturnExpr()) {
 		fprintf(stderr, "Parse a return statement\n");
+		getNextToken();
 	}
 	else {
 		//Skip token for error recovery.
@@ -941,9 +950,9 @@ static void MainLoop() {
 			getNextToken();
 			break;
 		}
-		
+
 	}
-	
+
 }
 //===----------------------------------------------------------------------===//
 // Program Parse Code
@@ -972,75 +981,73 @@ static std::unique_ptr<FunctionAST> ParseProgram() {
 // Code Generation
 //===----------------------------------------------------------------------===//
 
-static llvm::LLVMContext TheContext;
-static Module *TheModule;
-static llvm::IRBuilder<> Builder(TheContext);
-static std::map<std::string, Value*> NamedValues;
-
+static LLVMContext TheContext;
+static IRBuilder<> Builder(TheContext);
+static std::unique_ptr<Module> TheModule;
+static std::map<std::string, Value *> NamedValues;
 Value *LogErrorV(const char *Str) {
 	LogError(Str);
 	return nullptr;
 }
 
 Value *NumberExprAST::codegen() {
-	return nullptr;
-	//return ConstantFP::get(TheContext, APFloat(Val));
+	return ConstantFP::get(TheContext, APFloat(Val));
 }
 
 Value *VariableExprAST::codegen() {
-	return nullptr;
+	//return nullptr;
 	// Look this variable up in the function.
-	/*Value *V = NamedValues[Name];
+	Value *V = NamedValues[Name];
 	if (!V)
 	LogErrorV("Unknown variable name");
-	return V;*/
+	return V;
 }
 
 Value *BinaryExprAST::codegen() {
-	return nullptr;
-	//Value *L = LHS->codegen();
-	//Value *R = RHS->codegen();
-	//if (!L || !R)
-	//	return nullptr;
+	//return nullptr;
+	Value *L = LHS->codegen();
+	Value *R = RHS->codegen();
+	if (!L || !R)
+		return nullptr;
 
-	//switch (Op) {
-	//case '+':
-	//	return Builder.CreateFAdd(L, R, "addtmp");
-	//case '-':
-	//	return Builder.CreateFSub(L, R, "subtmp");
-	//case '*':
-	//	return Builder.CreateFMul(L, R, "multmp");
-	////case '<':
-	////	L = Builder.CreateFCmpULT(L, R, "cmptmp");
-	////	// Convert bool 0/1 to double 0.0 or 1.0
-	////	return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),
-	////		"booltmp");
-	//case '/':
-	//	return Builder.CreateFDiv(L, R, "divtmp");
-	//default:
-	//	return LogErrorV("invalid binary operator");
-	//}
+	switch (Op) {
+	case '+':
+		return Builder.CreateFAdd(L, R, "addtmp");
+	case '-':
+		return Builder.CreateFSub(L, R, "subtmp");
+	case '*':
+		return Builder.CreateFMul(L, R, "multmp");
+	//case '<':
+	//	L = Builder.CreateFCmpULT(L, R, "cmptmp");
+	//	// Convert bool 0/1 to double 0.0 or 1.0
+	//	return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),
+	//		"booltmp");
+	case '/':
+		return Builder.CreateFDiv(L, R, "divtmp");
+	default:
+		return LogErrorV("invalid binary operator");
+	}
 }
 
 Value *CallExprAST::codegen() {
-	return nullptr;
+	/*return nullptr;*/
 	// Look up the name in the global module table.
-	//Function *CalleeF = TheModule->getFunction(Callee);
-	//if (!CalleeF)
-	//	return LogErrorV("Unknown function referenced");
+	Function *CalleeF = TheModule->getFunction(Callee);
+	if (!CalleeF)
+		return LogErrorV("Unknown function referenced");
 
-	//// If argument mismatch error.
-	//if (CalleeF->arg_size() != Args.size())
-	//	return LogErrorV("Incorrect # arguments passed");
+	// If argument mismatch error.
+	if (CalleeF->arg_size() != Args.size())
+		return LogErrorV("Incorrect # arguments passed");
 
-	//std::vector<Value *> ArgsV;
-	//for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-	//	ArgsV.push_back(Args[i]->codegen());
-	//	if (!ArgsV.back())
-	//		return nullptr;
-	//}
+	std::vector<Value *> ArgsV;
+	for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+		ArgsV.push_back(Args[i]->codegen());
+		if (!ArgsV.back())
+			return nullptr;
+	}
 
-	//return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
+	return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
 Value *StringAST::codegen() {
@@ -1072,88 +1079,88 @@ Value *ExprsAST::codegen() {
 }
 
 Function *PrototypeAST::codegen() {
-	return nullptr;
+	/*return nullptr;*/
 	// Make the function type:  double(double,double) etc.
-	//std::vector<Type *> Doubles(Args.size(), Type::getDoubleTy(TheContext));
-	//FunctionType *FT =
-	//	FunctionType::get(Type::getDoubleTy(TheContext), Doubles, false);
+	std::vector<Type *> Doubles(Args.size(), Type::getDoubleTy(TheContext));
+	FunctionType *FT =
+		FunctionType::get(Type::getDoubleTy(TheContext), Doubles, false);
 
-	//Function *F =
-	//	Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
+	Function *F =
+		Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
 
-	//// Set names for all arguments.
-	//unsigned Idx = 0;
-	//for (auto &Arg : F->args())
-	//	Arg.setName(Args[Idx++]);
+	// Set names for all arguments.
+	unsigned Idx = 0;
+	for (auto &Arg : F->args())
+		Arg.setName(Args[Idx++]);
 
-	//return F;
+	return F;
 }
 
 Function *FunctionAST::codegen() {
-	return nullptr;
+	/*return nullptr;*/
 	// First, check for an existing function from a previous 'extern' declaration.
-	//Function *TheFunction = TheModule->getFunction(Proto->getName());
+	Function *TheFunction = TheModule->getFunction(Proto->getName());
 
-	//if (!TheFunction)
-	//	TheFunction = Proto->codegen();
+	if (!TheFunction)
+		TheFunction = Proto->codegen();
 
-	//if (!TheFunction)
-	//	return nullptr;
+	if (!TheFunction)
+		return nullptr;
 
-	//// Create a new basic block to start insertion into.
-	//BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
-	//Builder.SetInsertPoint(BB);
+	// Create a new basic block to start insertion into.
+	BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
+	Builder.SetInsertPoint(BB);
 
-	//// Record the function arguments in the NamedValues map.
-	//NamedValues.clear();
-	//for (auto &Arg : TheFunction->args())
-	//	NamedValues[Arg.getName()] = &Arg;
+	// Record the function arguments in the NamedValues map.
+	NamedValues.clear();
+	for (auto &Arg : TheFunction->args())
+		NamedValues[Arg.getName()] = &Arg;
 
-	//if (Value *RetVal = Body->codegen()) {
-	//	// Finish off the function.
-	//	Builder.CreateRet(RetVal);
+	if (Value *RetVal = Body->codegen()) {
+		// Finish off the function.
+		Builder.CreateRet(RetVal);
 
-	//	// Validate the generated code, checking for consistency.
-	//	verifyFunction(*TheFunction);
+		// Validate the generated code, checking for consistency.
+		verifyFunction(*TheFunction);
 
-	//	return TheFunction;
-	//}
+		return TheFunction;
+	}
 
-	// Error reading body, remove function.
-	/*TheFunction->eraseFromParent();
-	return nullptr;*/
+	//  Error reading body, remove function.
+	TheFunction->eraseFromParent();
+	return nullptr;
 }
 
 //string的代码生成
 Value *StringAST::Codegen()
 {
-	/*
+	
 	Value *V = NamedValues[str];
 	return V;
-	*/
-	return nullptr;
+	
+	/*return nullptr;*/
 }
 
 //返回语句代码生成codegen()
 Value *RetStatAST::codegen()
 {
-	/*
+	
 	Value *RetValue = Expr->codegen();
 	return Builder.CreateRet(RetValue);
-	*/
-	return nullptr;
+	
+	/*return nullptr;*/
 }
 
 //打印语句代码生成codegen()
 Value *PrtStatAST::codegen()
 {
-	/*
-	std::vector<Value *> ArgsP;
+	
+	/*std::vector<Value *> ArgsP;
 	for (unsigned i = 0, e = Args.size(); i != e; ++i) {
 	ArgsP.push_back(Args[i]->codegen());
 	}
-	//return Builder.CreatePrt(ArgsP);
-	*/
+	return Builder.CreatePrt(ArgsP);*/
+	
 	return nullptr;
 }
 
