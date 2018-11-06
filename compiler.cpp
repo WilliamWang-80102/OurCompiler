@@ -9,7 +9,6 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
-#include <iostream>
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -21,6 +20,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
+
 
 
 
@@ -535,7 +535,7 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 			}*/
 		}
 		if (CurTok == ';')break;
-		if (CurTok != ','&&CurTok != ';') {
+		if (CurTok != ',') {
 			getNextToken();
 			return LogError("Unexpected token");
 		}
@@ -1181,10 +1181,14 @@ int main() {
 	fprintf(stderr, "ready> ");
 	getNextToken();
 
+	// Make the module, which holds all the code.
+	TheModule = llvm::make_unique<Module>("my cool jit", TheContext);
 
 	// Run the main "interpreter loop" now.
 	MainLoop();
-	//ParseProgram();
+	
+	// Print out all of the generated code.
+	TheModule->print(errs(), nullptr);
 
 	return 0;
 }
