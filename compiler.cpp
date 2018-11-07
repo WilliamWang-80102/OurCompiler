@@ -622,7 +622,8 @@ static std::unique_ptr<ExprAST> ParseDclrExpr() {
 		}
 	}
 	if (Names.empty())  return LogError("Expect var names"); 
-	else return llvm::make_unique<DeclareExprAST>(std::move(Names)); 
+	else return llvm::make_unique<DeclareExprAST>(std::move(Names));
+
 }
 
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
@@ -764,9 +765,10 @@ static std::unique_ptr<ExprsAST> ParseStats() {
 		getNextToken();
 		while (CurTok != '}') {
 			Stats.push_back(std::move(ParseStat()));
+			getNextToken();
 		}
 		//消耗掉'}'
-		getNextToken();
+		//getNextToken();
 		return llvm::make_unique<ExprsAST>(std::move(Stats));
 	}
 }
@@ -778,6 +780,7 @@ static std::unique_ptr<ExprAST> ParseStat() {
 		//VAR
 	case tok_var:
 		return ParseDclrExpr();
+		
 		//IF
 	case tok_if:
 		return ParseIfExpr();
@@ -829,7 +832,7 @@ static void HandleContinue() {
 static void HandleDeclaration() {
 	if (ParseDclrExpr()) {
 		fprintf(stderr, "Parsed a declaration statement.\n");
-		getNextToken();
+		//getNextToken();
 	}
 	else {
 		// Skip token for error recovery.
@@ -840,6 +843,7 @@ static void HandleDeclaration() {
 static void HandleDefinition() {
 	if (ParseDefinition()) {
 		fprintf(stderr, "Parsed a function definition.\n");
+		getNextToken();
 	}
 	else {
 		// Skip token for error recovery.
