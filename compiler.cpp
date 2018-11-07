@@ -979,64 +979,55 @@ Value *LogErrorV(const char *Str) {
 }
 
 Value *NumberExprAST::codegen() {
-	return nullptr;
-	//return ConstantFP::get(TheContext, APFloat(Val));
+	return ConstantFP::get(TheContext, APFloat(Val));
 }
 
 Value *VariableExprAST::codegen() {
-	return nullptr;
 	// Look this variable up in the function.
-	/*Value *V = NamedValues[Name];
+	Value *V = NamedValues[Name];
 	if (!V)
 	LogErrorV("Unknown variable name");
-	return V;*/
+	return V;
 }
 
 Value *BinaryExprAST::codegen() {
-	return nullptr;
-	//Value *L = LHS->codegen();
-	//Value *R = RHS->codegen();
-	//if (!L || !R)
-	//	return nullptr;
+	Value *L = LHS->codegen();
+	Value *R = RHS->codegen();
+	if (!L || !R)
+		return nullptr;
 
-	//switch (Op) {
-	//case '+':
-	//	return Builder.CreateFAdd(L, R, "addtmp");
-	//case '-':
-	//	return Builder.CreateFSub(L, R, "subtmp");
-	//case '*':
-	//	return Builder.CreateFMul(L, R, "multmp");
-	////case '<':
-	////	L = Builder.CreateFCmpULT(L, R, "cmptmp");
-	////	// Convert bool 0/1 to double 0.0 or 1.0
-	////	return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),
-	////		"booltmp");
-	//case '/':
-	//	return Builder.CreateFDiv(L, R, "divtmp");
-	//default:
-	//	return LogErrorV("invalid binary operator");
-	//}
+	switch (Op) {
+	case '+':
+		return Builder.CreateFAdd(L, R, "addtmp");
+	case '-':
+		return Builder.CreateFSub(L, R, "subtmp");
+	case '*':
+		return Builder.CreateFMul(L, R, "multmp");
+	case '/':
+		return Builder.CreateFDiv(L, R, "divtmp");
+	default:
+		return LogErrorV("invalid binary operator");
+	}
 }
 
 Value *CallExprAST::codegen() {
-	return nullptr;
 	// Look up the name in the global module table.
-	//Function *CalleeF = TheModule->getFunction(Callee);
-	//if (!CalleeF)
-	//	return LogErrorV("Unknown function referenced");
+	Function *CalleeF = TheModule->getFunction(Callee);
+	if (!CalleeF)
+		return LogErrorV("Unknown function referenced");
 
-	//// If argument mismatch error.
-	//if (CalleeF->arg_size() != Args.size())
-	//	return LogErrorV("Incorrect # arguments passed");
+	// If argument mismatch error.
+	if (CalleeF->arg_size() != Args.size())
+		return LogErrorV("Incorrect # arguments passed");
 
-	//std::vector<Value *> ArgsV;
-	//for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-	//	ArgsV.push_back(Args[i]->codegen());
-	//	if (!ArgsV.back())
-	//		return nullptr;
-	//}
+	std::vector<Value *> ArgsV;
+	for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+		ArgsV.push_back(Args[i]->codegen());
+		if (!ArgsV.back())
+			return nullptr;
+	}
 
-	//return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
+	return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
 Value *StringAST::codegen() {
@@ -1068,66 +1059,60 @@ Value *ExprsAST::codegen() {
 }
 
 Function *PrototypeAST::codegen() {
-	return nullptr;
-	// Make the function type:  double(double,double) etc.
-	//std::vector<Type *> Doubles(Args.size(), Type::getDoubleTy(TheContext));
-	//FunctionType *FT =
-	//	FunctionType::get(Type::getDoubleTy(TheContext), Doubles, false);
+	//Make the function type:  double(double,double) etc.
+	std::vector<Type *> Doubles(Args.size(), Type::getDoubleTy(TheContext));
+	FunctionType *FT =
+		FunctionType::get(Type::getDoubleTy(TheContext), Doubles, false);
 
-	//Function *F =
-	//	Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
+	Function *F =
+		Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
 
-	//// Set names for all arguments.
-	//unsigned Idx = 0;
-	//for (auto &Arg : F->args())
-	//	Arg.setName(Args[Idx++]);
+	// Set names for all arguments.
+	unsigned Idx = 0;
+	for (auto &Arg : F->args())
+		Arg.setName(Args[Idx++]);
 
-	//return F;
+	return F;
 }
 
 Function *FunctionAST::codegen() {
-	return nullptr;
 	// First, check for an existing function from a previous 'extern' declaration.
-	//Function *TheFunction = TheModule->getFunction(Proto->getName());
+	Function *TheFunction = TheModule->getFunction(Proto->getName());
 
-	//if (!TheFunction)
-	//	TheFunction = Proto->codegen();
+	if (!TheFunction)
+		TheFunction = Proto->codegen();
 
-	//if (!TheFunction)
-	//	return nullptr;
+	if (!TheFunction)
+		return nullptr;
 
-	//// Create a new basic block to start insertion into.
-	//BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
-	//Builder.SetInsertPoint(BB);
+	// Create a new basic block to start insertion into.
+	BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
+	Builder.SetInsertPoint(BB);
 
-	//// Record the function arguments in the NamedValues map.
-	//NamedValues.clear();
-	//for (auto &Arg : TheFunction->args())
-	//	NamedValues[Arg.getName()] = &Arg;
+	// Record the function arguments in the NamedValues map.
+	NamedValues.clear();
+	for (auto &Arg : TheFunction->args())
+		NamedValues[Arg.getName()] = &Arg;
 
-	//if (Value *RetVal = Body->codegen()) {
-	//	// Finish off the function.
-	//	Builder.CreateRet(RetVal);
+	if (Value *RetVal = Body->codegen()) {
+		// Finish off the function.
+		Builder.CreateRet(RetVal);
 
-	//	// Validate the generated code, checking for consistency.
-	//	verifyFunction(*TheFunction);
+		// Validate the generated code, checking for consistency.
+		verifyFunction(*TheFunction);
 
-	//	return TheFunction;
-	//}
-
+		return TheFunction;
+	}
 	// Error reading body, remove function.
-	/*TheFunction->eraseFromParent();
-	return nullptr;*/
+	TheFunction->eraseFromParent();
+	return nullptr;
 }
 
 //string的代码生成
 Value *StringAST::Codegen()
 {
-	/*
 	Value *V = NamedValues[str];
 	return V;
-	*/
-	return nullptr;
 }
 
 //返回语句代码生成codegen()
