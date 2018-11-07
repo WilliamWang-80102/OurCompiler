@@ -999,7 +999,6 @@ Value *NumberExprAST::codegen() {
 }
 
 Value *VariableExprAST::codegen() {
-	//return nullptr;
 	// Look this variable up in the function.
 	Value *V = NamedValues[Name];
 	if (!V)
@@ -1008,7 +1007,6 @@ Value *VariableExprAST::codegen() {
 }
 
 Value *BinaryExprAST::codegen() {
-	//return nullptr;
 	Value *L = LHS->codegen();
 	Value *R = RHS->codegen();
 	if (!L || !R)
@@ -1021,11 +1019,6 @@ Value *BinaryExprAST::codegen() {
 		return Builder.CreateFSub(L, R, "subtmp");
 	case '*':
 		return Builder.CreateFMul(L, R, "multmp");
-	//case '<':
-	//	L = Builder.CreateFCmpULT(L, R, "cmptmp");
-	//	// Convert bool 0/1 to double 0.0 or 1.0
-	//	return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),
-	//		"booltmp");
 	case '/':
 		return Builder.CreateFDiv(L, R, "divtmp");
 	default:
@@ -1034,7 +1027,6 @@ Value *BinaryExprAST::codegen() {
 }
 
 Value *CallExprAST::codegen() {
-	/*return nullptr;*/
 	// Look up the name in the global module table.
 	Function *CalleeF = TheModule->getFunction(Callee);
 	if (!CalleeF)
@@ -1083,8 +1075,7 @@ Value *ExprsAST::codegen() {
 }
 
 Function *PrototypeAST::codegen() {
-	/*return nullptr;*/
-	// Make the function type:  double(double,double) etc.
+	//Make the function type:  double(double,double) etc.
 	std::vector<Type *> Doubles(Args.size(), Type::getDoubleTy(TheContext));
 	FunctionType *FT =
 		FunctionType::get(Type::getDoubleTy(TheContext), Doubles, false);
@@ -1101,7 +1092,6 @@ Function *PrototypeAST::codegen() {
 }
 
 Function *FunctionAST::codegen() {
-	/*return nullptr;*/
 	// First, check for an existing function from a previous 'extern' declaration.
 	Function *TheFunction = TheModule->getFunction(Proto->getName());
 
@@ -1129,8 +1119,7 @@ Function *FunctionAST::codegen() {
 
 		return TheFunction;
 	}
-
-	//  Error reading body, remove function.
+	// Error reading body, remove function.
 	TheFunction->eraseFromParent();
 	return nullptr;
 }
@@ -1138,11 +1127,8 @@ Function *FunctionAST::codegen() {
 //string的代码生成
 Value *StringAST::Codegen()
 {
-	
 	Value *V = NamedValues[str];
 	return V;
-	
-	/*return nullptr;*/
 }
 
 //返回语句代码生成codegen()
