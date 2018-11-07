@@ -841,9 +841,23 @@ static void HandleDeclaration() {
 }
 
 static void HandleDefinition() {
+	/*
 	if (ParseDefinition()) {
 		fprintf(stderr, "Parsed a function definition.\n");
 		getNextToken();
+	}
+	else {
+		// Skip token for error recovery.
+		getNextToken();
+	}
+	*/
+	if (auto FnAST = ParseDefinition()) {
+		if (auto *FnIR = FnAST->codegen()) {
+			fprintf(stderr, "Read function definition:");
+			FnIR->print(errs());
+			fprintf(stderr, "\n");
+			getNextToken();
+		}
 	}
 	else {
 		// Skip token for error recovery.
