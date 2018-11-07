@@ -17,8 +17,11 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "llvm/IR/Module.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
 
-using namespace llvm;
+
 
 
 #define NUM_EXPR "NumberExpression"
@@ -36,6 +39,7 @@ using namespace llvm;
 #define IF_EXPR "IfExpression"
 #define WHILE_EXPR "WhileExpression"
 
+using namespace llvm;
 //===----------------------------------------------------------------------===//
 // Lexer
 //===----------------------------------------------------------------------===//
@@ -83,14 +87,10 @@ static int gettok() {
 	static int LastChar = ' ';
 
 	// Skip any whitespace.
-	while (isspace(LastChar)){
-		/*if (LastChar == 10) {
-			LastChar = ' ';
-			return 10;
-		}*/
+	while (isspace(LastChar)) {
 		LastChar = getchar();
 	}
-		
+
 
 	if (isalpha(LastChar)) { //字母
 		IdentifierStr = LastChar;
@@ -162,10 +162,13 @@ static int gettok() {
 		if (LastChar != EOF)
 			return gettok();
 	}
+	if (LastChar == '"') {
+		LastChar = ' ';
+		return '"';
+	}
 	// Check for end of file.  Don't eat the EOF.
 	if (LastChar == EOF)
 		return tok_eof;
-
 	// Otherwise, just return the character as its ascii value.
 	int ThisChar = LastChar;
 	LastChar = getchar();
@@ -409,9 +412,11 @@ static std::unique_ptr<ExprAST> ParseString()
 {
 	std::string str = "";
 	char c;
-	while ((c = getchar()) != '"')
-	{
+	while ((c = getchar()) != '"') {
 		str += c;
+		if (c == '\n') {
+			return LogError("Expect '\"'");
+		}
 	}
 	auto Result = llvm::make_unique<StringAST>(str);
 	return std::move(Result);
@@ -501,41 +506,44 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
 {
 	getNextToken();//eat RETURN
 	std::unique_ptr<ExprAST> Expr = ParseExpression();
-	if (Expr) {
-		return llvm::make_unique<RetStatAST>(std::move(Expr));
+	if(CurTok==';'){
+		if (Expr) return llvm::make_unique<RetStatAST>(std::move(Expr));
+		else return LogError("Expect return value!");
 	}
-	else return LogError("Expect return value!");
+	else return LogError("Expect ';'");
 }
 
 //ParsePrintExpr - 实现打印语句
 static std::unique_ptr<ExprAST> ParsePrintExpr()
 {
 	std::vector <std::unique_ptr<ExprAST>> Args;
-	//滤去PRINT
-	getNextToken();
-	while (CurTok != '#')
+	while (CurTok != ';')
 	{
-		if (CurTok == '"')
-		{
-			getNextToken();
-			while (CurTok != '"')
-			{
-				//getPrintString()函数用于获取双引号之间的内容
-				Args.push_back(ParseExpression());
-			}
+		getNextToken();
+		if (CurTok == '"'){
+			//getPrintString()函数用于获取双引号之间的内容
+			Args.push_back(ParseString());
 			getNextToken();
 		}
-		if (CurTok != ',') {
+		if (CurTok == tok_identifier) {
 			auto E = ParseExpression();
 			if (E) {
 				Args.push_back(std::move(E));
 			}
+			/*else {
+				return LogError("Unexpected token");
+			}*/
 		}
-		else getNextToken();
+		if (CurTok == ';')break;
+		if (CurTok != ',') {
+			getNextToken();
+			return LogError("Unexpected token");
+		}
 	}
 	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
 	return Result;
 }
+
 //处理IF和WHILE后面的条件语句
 static std::unique_ptr<ExprAST> ParseConditionExpr() {
 	std::unique_ptr<ExprAST> Cond = ParseExpression();
@@ -604,16 +612,17 @@ static std::unique_ptr<ExprAST> ParseDclrExpr() {
 	while (CurTok == tok_identifier) {
 		Names.push_back(IdentifierStr);
 		getNextToken();
-		if (CurTok == ',')
-			getNextToken();
-		if (CurTok != tok_identifier || CurTok == 10) {
-			LogError("Expect var names");//eat ','
-			getNextToken();
-			return nullptr;
+		if (CurTok == ','){
+			getNextToken();//eat ','
+			if (CurTok == ';') {
+				LogError("Expect var names");
+				getNextToken();//eat ';'
+				return nullptr;
+			}
 		}
 	}
-	if (Names.empty()) return LogError("Expect var names");
-	else return llvm::make_unique<DeclareExprAST>(std::move(Names));
+	if (Names.empty())  return LogError("Expect var names"); 
+	else return llvm::make_unique<DeclareExprAST>(std::move(Names)); 
 }
 
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
@@ -675,7 +684,7 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
 ///
 static std::unique_ptr<ExprAST> ParseExpression() {
 	//这里如果读到LHS为空，检查后面是否为'-'
-	std::unique_ptr<ExprAST> LHS ;
+	std::unique_ptr<ExprAST> LHS;
 	if (CurTok != '-') {
 		LHS = ParsePrimary();
 		if (!LHS)
@@ -820,6 +829,7 @@ static void HandleContinue() {
 static void HandleDeclaration() {
 	if (ParseDclrExpr()) {
 		fprintf(stderr, "Parsed a declaration statement.\n");
+		getNextToken();
 	}
 	else {
 		// Skip token for error recovery.
@@ -840,6 +850,7 @@ static void HandleDefinition() {
 static void HandleExtern() {
 	if (ParseExtern()) {
 		fprintf(stderr, "Parsed an extern\n");
+		getNextToken();
 	}
 	else {
 		// Skip token for error recovery.
@@ -881,6 +892,7 @@ static void HandleWhile() {
 static void HandlePrint() {
 	if (ParsePrintExpr()) {
 		fprintf(stderr, "Parse a print statement\n");
+		getNextToken();
 	}
 	else {
 		//Skip token for error recovery.
@@ -891,6 +903,7 @@ static void HandlePrint() {
 static void HandleReturn() {
 	if (ParseReturnExpr()) {
 		fprintf(stderr, "Parse a return statement\n");
+		getNextToken();
 	}
 	else {
 		//Skip token for error recovery.
@@ -937,9 +950,9 @@ static void MainLoop() {
 			getNextToken();
 			break;
 		}
-		
+
 	}
-	
+
 }
 //===----------------------------------------------------------------------===//
 // Program Parse Code
@@ -972,7 +985,6 @@ static LLVMContext TheContext;
 static IRBuilder<> Builder(TheContext);
 static std::unique_ptr<Module> TheModule;
 static std::map<std::string, Value *> NamedValues;
-
 Value *LogErrorV(const char *Str) {
 	LogError(Str);
 	return nullptr;
@@ -1118,23 +1130,23 @@ Value *StringAST::Codegen()
 //返回语句代码生成codegen()
 Value *RetStatAST::codegen()
 {
-	/*
+	
 	Value *RetValue = Expr->codegen();
 	return Builder.CreateRet(RetValue);
-	*/
-	return nullptr;
+	
+	/*return nullptr;*/
 }
 
 //打印语句代码生成codegen()
 Value *PrtStatAST::codegen()
 {
-	/*
-	std::vector<Value *> ArgsP;
+	
+	/*std::vector<Value *> ArgsP;
 	for (unsigned i = 0, e = Args.size(); i != e; ++i) {
 	ArgsP.push_back(Args[i]->codegen());
 	}
-	//return Builder.CreatePrt(ArgsP);
-	*/
+	return Builder.CreatePrt(ArgsP);*/
+	
 	return nullptr;
 }
 
