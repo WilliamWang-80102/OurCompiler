@@ -840,9 +840,25 @@ static void HandleDeclaration() {
 	}
 }
 
+//static void HandleDefinition() {
+//	if (ParseDefinition()) {
+//		fprintf(stderr, "Parsed a function definition.\n");
+//		getNextToken();
+//	}
+//	else {
+//		// Skip token for error recovery.
+//		getNextToken();
+//	}
+//}
+
 static void HandleDefinition() {
-	if (ParseDefinition()) {
-		fprintf(stderr, "Parsed a function definition.\n");
+	if (auto FnAST = ParseDefinition()) {
+		if (auto *FnIR = FnAST->codegen()) {
+			fprintf(stderr, "Read function definition:");
+			FnIR->print(errs());
+			fprintf(stderr, "\n");
+			
+		}
 		getNextToken();
 	}
 	else {
@@ -850,7 +866,6 @@ static void HandleDefinition() {
 		getNextToken();
 	}
 }
-
 static void HandleExtern() {
 	if (ParseExtern()) {
 		fprintf(stderr, "Parsed an extern\n");
