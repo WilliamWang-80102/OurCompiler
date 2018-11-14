@@ -965,6 +965,10 @@ static void MainLoop() {
 		default:
 			LogError("Error!Expect a function definition");
 			fprintf(stderr, "ready> ");
+			//getNextToken();
+			//报错则清空输入流中的数据，期待用户重新输入
+			while (getNextToken() != '\n') { }
+			//期待下一项输出
 			getNextToken();
 			break;
 		}
@@ -1008,10 +1012,12 @@ Value *LogErrorV(const char *Str) {
 	return nullptr;
 }
 
+//常数处理
 Value *NumberExprAST::codegen() {
 	return ConstantFP::get(TheContext, APFloat(Val));
 }
 
+//单个变量中间代码处理
 Value *VariableExprAST::codegen() {
 	// Look this variable up in the function.
 	Value *V = NamedValues[Name];
@@ -1020,6 +1026,7 @@ Value *VariableExprAST::codegen() {
 	return V;
 }
 
+//二元表达式中间代码生成
 Value *BinaryExprAST::codegen() {
 	Value *L = LHS->codegen();
 	Value *R = RHS->codegen();
@@ -1085,7 +1092,8 @@ Value *DeclareExprAST::codegen() {
 }
 
 Value *ExprsAST::codegen() {
-	return nullptr;
+	//假设函数体只能包含一个ret表达式，且就是第一个 WZW
+	return Stats[0]->codegen();
 }
 
 Function *PrototypeAST::codegen() {
@@ -1148,11 +1156,8 @@ Value *StringAST::Codegen()
 //返回语句代码生成codegen()
 Value *RetStatAST::codegen()
 {
-	
 	Value *RetValue = Expr->codegen();
 	return Builder.CreateRet(RetValue);
-	
-	/*return nullptr;*/
 }
 
 //打印语句代码生成codegen()
