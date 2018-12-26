@@ -125,8 +125,11 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 		else
 			return LogError("Expect ':=', error at ParseIdentifierExpr");// 没有'='的异常处理
 	}
-	if (CurTok != '(') // Simple variable ref.
+
+	// 简单变量
+	if (CurTok != '(') 
 		return llvm::make_unique<VariableExprAST>(IdName);
+
 	// Call.
 	getNextToken(); // eat (
 	std::vector<std::unique_ptr<ExprAST>> Args;
@@ -158,40 +161,39 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
 {
 	getNextToken();//eat RETURN
 	std::unique_ptr<ExprAST> Expr = ParseExpression();
-	if (CurTok == ';') {
-		if (Expr) return llvm::make_unique<RetStatAST>(std::move(Expr));
-		else return LogError("Expect return value!");
-	}
-	else return LogError("Expect ';'");
+	if (Expr) 
+		return llvm::make_unique<RetStatAST>(std::move(Expr));
+	else 
+		return LogError("Expect return value!");
 }
 
 //ParsePrintExpr - 实现打印语句
 static std::unique_ptr<ExprAST> ParsePrintExpr()
 {
 	std::vector <std::unique_ptr<ExprAST>> Args;
-	while (CurTok != ';')
-	{
+	//消耗掉 PRINT
+	getNextToken();
+	if (CurTok == '"') {
+		//getPrintString()函数用于获取双引号之间的内容
+		Args.push_back(ParseString());
 		getNextToken();
-		if (CurTok == '"') {
-			//getPrintString()函数用于获取双引号之间的内容
-			Args.push_back(ParseString());
-			getNextToken();
-		}
-		if (CurTok == tok_identifier) {
-			auto E = ParseExpression();
-			if (E) {
-				Args.push_back(std::move(E));
-			}
-			/*else {
-			return LogError("Unexpected token");
-			}*/
-		}
-		if (CurTok == ';')break;
-		if (CurTok != ',') {
-			getNextToken();
-			return LogError("Unexpected token");
-		}
 	}
+	if (CurTok == tok_identifier) {
+		auto E = ParseExpression();
+		if (E) {
+			Args.push_back(std::move(E));
+		}
+		/*else {
+		return LogError("Unexpected token");
+		}*/
+	}
+	/*
+	if (CurTok != ',') {
+		getNextToken();
+		return LogError("Unexpected token");
+	}
+	*/
+	
 	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
 	return Result;
 }
@@ -204,6 +206,7 @@ static std::unique_ptr<ExprAST> ParseConditionExpr() {
 	}
 	else return LogError("Expect condition statement!");
 }
+
 //ParseWhileExpr - 实现While循环
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
 	getNextToken();//eat WHILE
@@ -214,7 +217,6 @@ static std::unique_ptr<ExprAST> ParseWhileExpr() {
 		getNextToken();//eat DO
 		Stat = ParseStats();
 		if (!Stat) return LogError("Expect 'DO' statements!");
-		//return LogError("Not A WHILE Parser!");
 	}
 	else return LogError("Expect 'DO'!");
 	if (CurTok == tok_done) {
@@ -224,6 +226,7 @@ static std::unique_ptr<ExprAST> ParseWhileExpr() {
 	}
 	else return LogError("Expect 'DONE'!");//读到done可以安全退出
 }
+
 //ParseIfExpr - 实现If判断
 static std::unique_ptr<ExprAST> ParseIfExpr() {
 	getNextToken();//eat IF
@@ -259,21 +262,18 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
 
 //ParseDclrExpr - 实现变量声明语句解析
 static std::unique_ptr<ExprAST> ParseDclrExpr() {
+	//消耗VAR
 	getNextToken();
+
 	std::vector<std::string> Names;
 	while (CurTok == tok_identifier) {
 		Names.push_back(IdentifierStr);
 		getNextToken();
 		if (CurTok == ',') {
 			getNextToken();//eat ','
-			if (CurTok == ';') {//防止出现 VAR X,;之类的情况
-				LogError("Expect var names");
-				getNextToken();//eat ';'
-				return nullptr;
-			}
 		}
 	}
-	getNextToken();//滤去';'
+	
 	if (Names.empty()) {//防止出现 VAR ;的空变量声明情况
 		return LogError("Expect var names");
 	}
@@ -423,7 +423,6 @@ static std::unique_ptr<ExprsAST> ParseStats() {
 		getNextToken();//滤掉'{'
 		while (CurTok != '}') {
 			Stats.push_back(std::move(ParseStat()));
-			getNextToken();
 		}
 		//消耗掉'}'
 		getNextToken();

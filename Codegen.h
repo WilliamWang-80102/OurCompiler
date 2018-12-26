@@ -126,7 +126,7 @@ Value *IfStatAST::codegen() {
 	// Emit then value.
 	Builder.SetInsertPoint(ThenBB);
 
-	Value *ThenV = ThenStat->codegen();
+	Value *ThenV = Then->codegen();
 	if (!ThenV)
 		return nullptr;
 
@@ -138,7 +138,7 @@ Value *IfStatAST::codegen() {
 	TheFunction->getBasicBlockList().push_back(ElseBB);
 	Builder.SetInsertPoint(ElseBB);
 
-	Value *ElseV = ElseStat->codegen();
+	Value *ElseV = Else->codegen();
 	if (!ElseV)
 		return nullptr;
 
