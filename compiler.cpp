@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
@@ -1238,4 +1236,4 @@ int main() {
 
 	return 0;
 }
->>>>>>> 5e6d8252540e01ec93d63e14be350cd726494b5a
+
