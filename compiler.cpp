@@ -26,12 +26,12 @@ int main() {
 	TheJIT = llvm::make_unique<KaleidoscopeJIT>();
 	InitializeModuleAndPassManager();
 	// Make the module, which holds all the code.
-	TheModule = llvm::make_unique<Module>("my cool jit", TheContext);
+	//TheModule = llvm::make_unique<Module>("my cool jit", TheContext);
 	// Run the main "interpreter loop" now.
 	MainLoop();
 	// Print out all of the generated code.
-	TheModule->print(errs(), nullptr);
-	system("pause");
+	//TheModule->print(errs(), nullptr);
+	//system("pause");
 	return 0;
 }
 
