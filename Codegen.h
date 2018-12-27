@@ -306,13 +306,13 @@ static void HandleDefinition() {
 			fprintf(stderr, "Read function definition:");
 			FnIR->print(errs());
 			fprintf(stderr, "\n");
-			//TheJIT->addModule(std::move(TheModule));
-			//InitializeModuleAndPassManager();
+			TheJIT->addModule(std::move(TheModule));
+			InitializeModuleAndPassManager();
 
 		}
 	}
 	else {
-		// Skip token for error recovery.
+		 //Skip token for error recovery.
 		getNextToken();
 	}
 }
