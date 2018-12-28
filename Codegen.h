@@ -99,9 +99,69 @@ Value *NullStatAST::codegen() {
 Value *AssignExpr::codegen() {
 	return nullptr;
 }
-
+static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction,
+	const std::string &VarName) {
+	IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+		TheFunction->getEntryBlock().begin());
+	return TmpB.CreateAlloca(Type::getDoubleTy(TheContext), 0,
+		VarName.c_str());
+}
 Value *WhileStatAST::codegen() {
-	return nullptr;
+	/*Function *TheFunction = Builder.GetInsertBlock()->getParent();
+	BasicBlock *LoopBB = BasicBlock::Create(TheContext, "loop", TheFunction);
+	BasicBlock *AfterBB = BasicBlock::Create(TheContext, "afterloop", TheFunction);
+
+	Value *EndCond = Cond->codegen();
+	if (!EndCond)
+		return nullptr;
+	EndCond= Builder.CreateFCmpONE(EndCond, ConstantFP::get(TheContext,APFloat(0.0)),"loopCondIn");
+	Builder.CreateCondBr(EndCond,LoopBB,AfterBB);
+	Builder.SetInsertPoint(LoopBB);
+	Value *inLoopVal = Stat->codegen();
+	if (!inLoopVal)
+		return nullptr;
+	EndCond = Builder.CreateFCmpONE(Cond->codegen(), ConstantFP::get(TheContext, APFloat(0.0)), "loopCondOut");
+	Builder.CreateCondBr(EndCond, LoopBB, AfterBB);
+	Builder.SetInsertPoint(AfterBB);
+	return Constant::getNullValue(Type::getDoubleTy(TheContext));*/
+	Function *TheFunction = Builder.GetInsertBlock()->getParent();
+	std::string VarName = "i";
+	AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
+	Value *CondV = Cond->codegen();
+	if (!CondV)
+			return nullptr;
+		Builder.CreateStore(CondV, Alloca);
+		Value * ExprV1 = Builder.CreateFCmpONE(
+			CondV, ConstantFP::get(TheContext, APFloat(0.0)), "loopcond");
+		BasicBlock *LoopBB = BasicBlock::Create(TheContext, "loop", TheFunction);
+		BasicBlock *AfterBB = BasicBlock::Create(TheContext, "afterloop");
+		Builder.CreateCondBr(ExprV1, LoopBB, AfterBB);
+		//Builder.CreateBr(LoopBB);
+		Builder.SetInsertPoint(LoopBB);
+		//AllocaInst *OldVal = NamedValues[VarName];
+		NamedValues[VarName] = Alloca;
+	
+		if (!Stat->codegen())
+			return nullptr;
+	
+		//Value *CurVar = Builder.CreateLoad(Alloca, VarName.c_str());
+		Value *CurVar = Cond->codegen();
+		CurVar = Builder.CreateFCmpONE(
+			CurVar, ConstantFP::get(TheContext, APFloat(0.0)), "loopcond1");
+	
+		BasicBlock *LoopEndBB = Builder.GetInsertBlock();
+		Builder.CreateCondBr(CurVar, LoopBB, AfterBB);
+		TheFunction->getBasicBlockList().push_back(AfterBB);
+		Builder.SetInsertPoint(AfterBB);
+	
+		
+		/*if (OldVal)
+		NamedValues[VarName] = OldVal;
+		else
+		NamedValues.erase(VarName);*/
+	
+		// for expr always returns 0.0.
+		return Constant::getNullValue(Type::getDoubleTy(TheContext));
 }
 
 Value *IfStatAST::codegen() {
@@ -312,7 +372,7 @@ static void HandleDefinition() {
 		}
 	}
 	else {
-		// Skip token for error recovery.
+		 //Skip token for error recovery.
 		getNextToken();
 	}
 }
