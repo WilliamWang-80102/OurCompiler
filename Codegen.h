@@ -88,10 +88,6 @@ Value *CallExprAST::codegen() {
 	return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
-Value *StringAST::codegen() {
-	return nullptr;
-}
-
 Value *NullStatAST::codegen() {
 	return nullptr;
 }
@@ -157,7 +153,25 @@ Value *IfStatAST::codegen() {
 }
 
 Value *DeclareExprAST::codegen() {
+	/*
+	std::vector<AllocaInst *> OldBindings;
+
+	Function *TheFunction = Builder.GetInsertBlock()->getParent();
+
+	for (unsigned i = 0, e = Names.size(); i != e; ++i) {
+		const std::string &VarName = Names[i];
+
+		Value *InitVal = ConstantInt::get(TheContext, APInt(32, 0));
+
+		AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
+		Builder.CreateStore(InitVal, Alloca);
+
+		OldBindings.push_back(NamedValues[VarName]);
+		NamedValues[VarName] = Alloca;
+	}
+
 	return nullptr;
+}*/
 }
 
 Value *ExprsAST::codegen() {

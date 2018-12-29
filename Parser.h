@@ -53,12 +53,16 @@ static std::unique_ptr<ExprAST> ParseDclrExpr();
 static std::unique_ptr<ExprAST> ParsePrimary();
 static std::unique_ptr<PrototypeAST> ParsePrototype();
 static std::unique_ptr<FunctionAST> ParseTopLevelExpr();
+static std::unique_ptr<FunctionAST> ParseBlock();
 static std::unique_ptr<PrototypeAST> ParseExtern();
 static std::unique_ptr<ExprsAST> ParseStats();
 static std::unique_ptr<ExprAST> ParseStat();
 static std::unique_ptr<ExprAST> ParseString();
 
+static std::unique_ptr<FunctionAST> ParseBlock() 
+{
 
+}
 ///printÓï¾äÖÐ×Ö·û´®½Úµã
 static std::unique_ptr<ExprAST> ParseString()
 {

@@ -46,9 +46,12 @@ namespace {
 	/// DeclareExprAST - Expression like 'VAR x,y,z'.
 	class DeclareExprAST : public ExprAST {
 		std::vector<std::string> Names;
+		//std::unique_ptr<ExprAST> Body;
 	public:
 		DeclareExprAST(const std::vector<std::string> &Names) : Names(Names) {}
 		Value *codegen() override;
+		//DeclareExprAST(std::vector<std::string> VarNames, std::unique_ptr<ExprAST> Body)
+			//:Names(std::move(VarNames)), Body(std::move(Body)) {}
 	};
 
 	/// AssignExpr - 负责处理赋值表达式
