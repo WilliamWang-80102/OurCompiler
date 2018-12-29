@@ -41,13 +41,29 @@ namespace {
 	public:
 		VariableExprAST(const std::string &Name) : Name(Name) {}
 		Value *codegen() override;
+		const std::string &getName() const { return Name; }
 	};
 
 	/// DeclareExprAST - Expression like 'VAR x,y,z'.
 	class DeclareExprAST : public ExprAST {
-		std::vector<std::string> Names;
+		std::vector<std::pair<std::string, std::unique_ptr<ExprAST>>> VarNames;
+		//std::unique_ptr<ExprAST> Body;
 	public:
-		DeclareExprAST(const std::vector<std::string> &Names) : Names(Names) {}
+		DeclareExprAST(std::vector<std::pair<std::string, std::unique_ptr<ExprAST>>> VarNames)
+			: VarNames(std::move(VarNames)) {}
+
+		Value *codegen() override;
+	};
+
+	/// UnaryExprAST - Expression class for a unary operator.
+	class UnaryExprAST : public ExprAST {
+		char Opcode;
+		std::unique_ptr<ExprAST> Operand;
+
+	public:
+		UnaryExprAST(char Opcode, std::unique_ptr<ExprAST> Operand)
+			: Opcode(Opcode), Operand(std::move(Operand)) {}
+
 		Value *codegen() override;
 	};
 
@@ -63,11 +79,11 @@ namespace {
 
 	/// BinaryExprAST - Expression class for a binary operator.
 	class BinaryExprAST : public ExprAST {
-		char Op;
+		int Op;
 		std::unique_ptr<ExprAST> LHS, RHS;
 
 	public:
-		BinaryExprAST(char Op, std::unique_ptr<ExprAST> LHS,
+		BinaryExprAST(int Op, std::unique_ptr<ExprAST> LHS,
 			std::unique_ptr<ExprAST> RHS)
 			: Op(Op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
 		Value *codegen() override;

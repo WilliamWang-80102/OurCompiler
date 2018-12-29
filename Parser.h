@@ -11,7 +11,20 @@
 /// token the parser is looking at.  getNextToken reads another token from the
 /// lexer and updates CurTok with its results.
 static int CurTok;
-static int getNextToken() { return CurTok = gettok(); }
+static int getNextToken() { 
+	CurTok = gettok();
+	//如果读到':'，则检查是否为赋值符号':='
+	if (CurTok == ':') {
+		CurTok = gettok();
+		if (CurTok == '=') {
+			CurTok = ':=';
+		}
+		else {
+			fprintf(stderr, "Error: 错误的赋值符号 :=");
+		}
+	}
+	return CurTok;
+}
 
 /// BinopPrecedence - This holds the precedence for each binary operator that is
 /// defined.
@@ -19,9 +32,9 @@ static std::map<char, int> BinopPrecedence;
 
 /// GetTokPrecedence - Get the precedence of the pending binary operator token.
 static int GetTokPrecedence() {
-	if (!isascii(CurTok))
+	if ((CurTok != ':=') && !isascii(CurTok))
 		return -1;
-
+	
 	// Make sure it's a declared binop.
 	int TokPrec = BinopPrecedence[CurTok];
 	if (TokPrec <= 0)
@@ -106,9 +119,9 @@ static std::unique_ptr<ExprAST> ParseNullExpr() {
 ///   ::= identifier ':= ' expression
 static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	std::string IdName = IdentifierStr;
-
 	getNextToken(); // eat identifier.
-					//如果标志符后为赋值符号
+	/*
+	//如果标志符后为赋值符号
 	if (CurTok == ':')
 	{
 		getNextToken();
@@ -125,7 +138,8 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 		else
 			return LogError("Expect ':=', error at ParseIdentifierExpr");// 没有'='的异常处理
 	}
-
+	*/
+	
 	// 简单变量
 	if (CurTok != '(') 
 		return llvm::make_unique<VariableExprAST>(IdName);
@@ -262,24 +276,40 @@ static std::unique_ptr<ExprAST> ParseIfExpr() {
 
 //ParseDclrExpr - 实现变量声明语句解析
 static std::unique_ptr<ExprAST> ParseDclrExpr() {
-	//消耗VAR
-	getNextToken();
+	getNextToken(); // eat the var.
 
-	std::vector<std::string> Names;
-	while (CurTok == tok_identifier) {
-		Names.push_back(IdentifierStr);
-		getNextToken();
-		if (CurTok == ',') {
-			getNextToken();//eat ','
+	std::vector<std::pair<std::string, std::unique_ptr<ExprAST>>> VarNames;
+
+	// At least one variable name is required.
+	if (CurTok != tok_identifier)
+		return LogError("expected identifier after var");
+
+	while (true) {
+		std::string Name = IdentifierStr;
+		getNextToken(); // eat identifier.
+
+		// Read the optional initializer.
+		std::unique_ptr<ExprAST> Init = nullptr;
+		if (CurTok == ':=') {
+			getNextToken(); // eat the ':='.
+
+			Init = ParseExpression();
+			if (!Init)
+				return nullptr;
 		}
+
+		VarNames.push_back(std::make_pair(Name, std::move(Init)));
+
+		// End of var list, exit loop.
+		if (CurTok != ',')
+			break;
+		getNextToken(); // eat the ','.
+
+		if (CurTok != tok_identifier)
+			return LogError("expected identifier list after var");
 	}
-	
-	if (Names.empty()) {//防止出现 VAR ;的空变量声明情况
-		return LogError("Expect var names");
-	}
-	else {
-		return llvm::make_unique<DeclareExprAST>(std::move(Names));
-	}
+
+	return llvm::make_unique<DeclareExprAST>(std::move(VarNames));
 }
 
 /// primary 是一个表达式中的基本单元，包括identifierexpr（变量， 函数调用， 赋值表达式）, numberexpr, parenexpr
@@ -299,8 +329,24 @@ static std::unique_ptr<ExprAST> ParsePrimary() {
 	}
 }
 
+/// unary
+///   ::= primary
+///   ::= '!' unary
+static std::unique_ptr<ExprAST> ParseUnary() {
+	// If the current token is not an operator, it must be a primary expr.
+	if (!isascii(CurTok) || CurTok == '(' || CurTok == ',')
+		return ParsePrimary();
+
+	// If this is a unary operator, read it.
+	int Opc = CurTok;
+	getNextToken();
+	if (auto Operand = ParseUnary())
+		return llvm::make_unique<UnaryExprAST>(Opc, std::move(Operand));
+	return nullptr;
+}
+
 /// binoprhs
-///   ::= ('+' primary)*
+///   ::= ('+' unary)*
 static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
 	std::unique_ptr<ExprAST> LHS) {
 	// If this is a binop, find its precedence.
@@ -316,10 +362,10 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
 		int BinOp = CurTok;
 		getNextToken(); // eat binop
 
-						// Parse the primary expression after the binary operator.
-		auto RHS = ParsePrimary();
+		// Parse the unary expression after the binary operator.
+		auto RHS = ParseUnary();
 		if (!RHS)
-			return LogError("ParseBinOpRHS error! Expect rhs but find null!");
+			return nullptr;
 
 		// If BinOp binds less tightly with RHS than the operator after RHS, let
 		// the pending operator take RHS as its LHS.
@@ -327,28 +373,23 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
 		if (TokPrec < NextPrec) {
 			RHS = ParseBinOpRHS(TokPrec + 1, std::move(RHS));
 			if (!RHS)
-				return LogError("ParseBinOpRHS error! Expect rhs but find null!");
+				return nullptr;
 		}
 
 		// Merge LHS/RHS.
-		LHS = llvm::make_unique<BinaryExprAST>(BinOp, std::move(LHS),
-			std::move(RHS));
+		LHS =
+			llvm::make_unique<BinaryExprAST>(BinOp, std::move(LHS), std::move(RHS));
 	}
 }
 
 /// expression
-///   ::= primary binoprhs
+///   ::= unary binoprhs
 ///
 static std::unique_ptr<ExprAST> ParseExpression() {
-	//首先将LHS设为数字常量结点，值为0
-	std::unique_ptr<ExprAST> LHS = llvm::make_unique<NumberExprAST>(0);
-	//如果不是以'-'打头的输入流，则应该是正常的多项表达式
-	if (CurTok != '-') {
-		LHS = ParsePrimary();
-		if (!LHS)
-			return LogError("ParseExpression error! Expect LHS but find null!");
-	}
-	//如果以'-'打头，那么就以0常量结点为LHS，进行多项表达式解析
+	auto LHS = ParseUnary();
+	if (!LHS)
+		return nullptr;
+
 	return ParseBinOpRHS(0, std::move(LHS));
 }
 
@@ -445,14 +486,7 @@ static std::unique_ptr<ExprAST> ParseStat() {
 		//WHILE
 	case tok_while:
 		return ParseWhileExpr();
-
-		//IDENTI
-	case tok_identifier:
-		return ParseExpression();
-
-	case tok_number:
-		return ParseExpression();
-
+		
 		//RETURN
 	case tok_return:
 		return ParseReturnExpr();
@@ -462,9 +496,6 @@ static std::unique_ptr<ExprAST> ParseStat() {
 		return ParsePrintExpr();
 
 	default:
-		//违背语法，报错
-		LogError("Unknown Statement!");
-		getNextToken();
-		return nullptr;
+		return ParseExpression();
 	}
 }
