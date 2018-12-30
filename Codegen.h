@@ -8,7 +8,7 @@
 static LLVMContext TheContext;
 static IRBuilder<> Builder(TheContext);
 static std::unique_ptr<Module> TheModule;
-static std::map<std::string, Value *> NamedValues;
+static std::map<std::string, AllocaInst*> NamedValues;
 static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
 static std::unique_ptr<KaleidoscopeJIT> TheJIT;
 static std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
@@ -33,6 +33,15 @@ Function *getFunction(std::string Name) {
 	return nullptr;
 }
 
+/// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
+/// the function.  This is used for mutable variables etc.
+static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction,
+	const std::string &VarName) {
+	IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+		TheFunction->getEntryBlock().begin());
+	return TmpB.CreateAlloca(Type::getDoubleTy(TheContext), nullptr, VarName);
+}
+
 //常数处理
 Value *NumberExprAST::codegen() {
 	return ConstantFP::get(TheContext, APFloat(Val));
@@ -44,11 +53,29 @@ Value *VariableExprAST::codegen() {
 	Value *V = NamedValues[Name];
 	if (!V)
 		LogErrorV("Unknown variable name");
-	return V;
+	// Load the value.
+	return Builder.CreateLoad(V, Name.c_str());
 }
 
 //二元表达式中间代码生成
 Value *BinaryExprAST::codegen() {
+	// Special case ':=' because we don't want to emit the LHS as an expression.
+	if (Op == ':=') {
+		// Assignment requires the LHS to be an identifier.
+		VariableExprAST *LHSE = dynamic_cast<VariableExprAST*>(LHS.get());
+		if (!LHSE)
+			return LogErrorV("destination of ':=' must be a variable");
+		// Codegen the RHS.
+		Value *Val = RHS->codegen();
+		if (!Val)
+			return nullptr;
+		// Look up the name.
+		Value *Variable = NamedValues[LHSE->getName()];
+		if (!Variable)
+			return LogErrorV("Unknown variable name");
+		Builder.CreateStore(Val, Variable);
+		return Val;
+	}
 	Value *L = LHS->codegen();
 	Value *R = RHS->codegen();
 	if (!L || !R)
@@ -88,6 +115,10 @@ Value *CallExprAST::codegen() {
 	return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
+Value *StringAST::codegen() {
+	return nullptr;
+}
+
 Value *NullStatAST::codegen() {
 	return nullptr;
 }
@@ -97,7 +128,61 @@ Value *AssignExpr::codegen() {
 }
 
 Value *WhileStatAST::codegen() {
-	return nullptr;
+	/*Function *TheFunction = Builder.GetInsertBlock()->getParent();
+	BasicBlock *LoopBB = BasicBlock::Create(TheContext, "loop", TheFunction);
+	BasicBlock *AfterBB = BasicBlock::Create(TheContext, "afterloop", TheFunction);
+
+	Value *EndCond = Cond->codegen();
+	if (!EndCond)
+		return nullptr;
+	EndCond= Builder.CreateFCmpONE(EndCond, ConstantFP::get(TheContext,APFloat(0.0)),"loopCondIn");
+	Builder.CreateCondBr(EndCond,LoopBB,AfterBB);
+	Builder.SetInsertPoint(LoopBB);
+	Value *inLoopVal = Stat->codegen();
+	if (!inLoopVal)
+		return nullptr;
+	EndCond = Builder.CreateFCmpONE(Cond->codegen(), ConstantFP::get(TheContext, APFloat(0.0)), "loopCondOut");
+	Builder.CreateCondBr(EndCond, LoopBB, AfterBB);
+	Builder.SetInsertPoint(AfterBB);
+	return Constant::getNullValue(Type::getDoubleTy(TheContext));*/
+	Function *TheFunction = Builder.GetInsertBlock()->getParent();
+	std::string VarName = "i";
+	AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
+	Value *CondV = Cond->codegen();
+	if (!CondV)
+		return nullptr;
+	Builder.CreateStore(CondV, Alloca);
+	Value * ExprV1 = Builder.CreateFCmpONE(
+		CondV, ConstantFP::get(TheContext, APFloat(0.0)), "loopcond");
+	BasicBlock *LoopBB = BasicBlock::Create(TheContext, "loop", TheFunction);
+	BasicBlock *AfterBB = BasicBlock::Create(TheContext, "afterloop");
+	Builder.CreateCondBr(ExprV1, LoopBB, AfterBB);
+	//Builder.CreateBr(LoopBB);
+	Builder.SetInsertPoint(LoopBB);
+	//AllocaInst *OldVal = NamedValues[VarName];
+	NamedValues[VarName] = Alloca;
+
+	if (!Stat->codegen())
+		return nullptr;
+
+	//Value *CurVar = Builder.CreateLoad(Alloca, VarName.c_str());
+	Value *CurVar = Cond->codegen();
+	CurVar = Builder.CreateFCmpONE(
+		CurVar, ConstantFP::get(TheContext, APFloat(0.0)), "loopcond1");
+
+	BasicBlock *LoopEndBB = Builder.GetInsertBlock();
+	Builder.CreateCondBr(CurVar, LoopBB, AfterBB);
+	TheFunction->getBasicBlockList().push_back(AfterBB);
+	Builder.SetInsertPoint(AfterBB);
+
+
+	/*if (OldVal)
+	NamedValues[VarName] = OldVal;
+	else
+	NamedValues.erase(VarName);*/
+
+	// for expr always returns 0.0.
+	return Constant::getNullValue(Type::getDoubleTy(TheContext));
 }
 
 Value *IfStatAST::codegen() {
@@ -153,38 +238,70 @@ Value *IfStatAST::codegen() {
 }
 
 Value *DeclareExprAST::codegen() {
-	/*
-	std::vector<AllocaInst *> OldBindings;
 
 	Function *TheFunction = Builder.GetInsertBlock()->getParent();
 
-	for (unsigned i = 0, e = Names.size(); i != e; ++i) {
-		const std::string &VarName = Names[i];
-
-		Value *InitVal = ConstantInt::get(TheContext, APInt(32, 0));
+	// Register all variables and emit their initializer.
+	for (unsigned i = 0, e = VarNames.size(); i != e; ++i) {
+		const std::string &VarName = VarNames[i].first;
+		ExprAST *Init = VarNames[i].second.get();
+		// Emit the initializer before adding the variable to scope, this prevents
+		// the initializer from referencing the variable itself, and permits stuff
+		// like this:
+		//  var a = 1 in
+		//    var a = a in ...   # refers to outer 'a'.
+		Value *InitVal;
+		if (Init) {
+			InitVal = Init->codegen();
+			if (!InitVal)
+				return nullptr;
+		}
+		else { // If not specified, use 0.0.
+			InitVal = ConstantFP::get(TheContext, APFloat(0.0));
+		}
 
 		AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
 		Builder.CreateStore(InitVal, Alloca);
-
+		/*
+		// Remember the old variable binding so that we can restore the binding when
+		// we unrecurse.
 		OldBindings.push_back(NamedValues[VarName]);
+		*/
+
+		// Remember this binding.
 		NamedValues[VarName] = Alloca;
 	}
 
-	return nullptr;
-}*/
+	// Return the body computation.
+	return Constant::getNullValue(Type::getDoubleTy(TheContext));
+}
+
+Value *UnaryExprAST::codegen() {
+	Value *OperandV = Operand->codegen();
+	if (!OperandV)
+		return nullptr;
+
+	Function *F = getFunction(std::string("unary") + Opcode);
+	if (!F)
+		return LogErrorV("Unknown unary operator");
+
+	return Builder.CreateCall(F, OperandV, "unop");
 }
 
 Value *ExprsAST::codegen() {
-	/*
 	//将语句块的内容全部转化为ir
-	for (std::vector<std::unique_ptr<ExprAST>>::const_iterator iter = Stats.cbegin(); iter != Stats.cend(); iter++) {
-	(*iter)->codegen();
+	for (std::vector<std::unique_ptr<ExprAST>>::const_iterator iter = Stats.cbegin();
+		iter != Stats.cend(); iter++) {
+		(*iter)->codegen();
 	}
 	//语句块分析结束，不返回指针
-	return nullptr;
-	*/
+	return Constant::getNullValue(Type::getDoubleTy(TheContext));
+
+	/*
 	//调试各生成代码阶段，语句块只有一句
 	return Stats[0]->codegen();
+	*/
+
 }
 
 Function *PrototypeAST::codegen() {
@@ -218,9 +335,31 @@ Function *FunctionAST::codegen() {
 
 	// Record the function arguments in the NamedValues map.
 	NamedValues.clear();
-	for (auto &Arg : TheFunction->args())
-		NamedValues[Arg.getName()] = &Arg;
+	for (auto &Arg : TheFunction->args()) {
+		// Create an alloca for this variable.
+		AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Arg.getName());
 
+		// Store the initial value into the alloca.
+		Builder.CreateStore(&Arg, Alloca);
+
+		// Add arguments to variable symbol table.
+		NamedValues[Arg.getName()] = Alloca;
+	}
+
+	Body->codegen();
+
+	// Validate the generated code, checking for consistency.
+	if (verifyFunction(*TheFunction)) {
+		// Error reading body, remove function.
+		TheFunction->eraseFromParent();
+		return nullptr;
+	}
+
+	// Run the optimizer on the function.
+	TheFPM->run(*TheFunction);
+
+	return TheFunction;
+	/*
 	if (Value *RetVal = Body->codegen()) {
 		// Finish off the function.
 		Builder.CreateRet(RetVal);
@@ -233,10 +372,7 @@ Function *FunctionAST::codegen() {
 
 		return TheFunction;
 	}
-
-	// Error reading body, remove function.
-	TheFunction->eraseFromParent();
-	return nullptr;
+	*/
 }
 
 //string的代码生成
@@ -250,10 +386,9 @@ Value *StringAST::Codegen()
 Value *RetStatAST::codegen()
 {
 	Value *RetValue = Expr->codegen();
-	/*
-	return Builder.CreateRet(RetValue);
-	*/
-	return RetValue;
+	Builder.CreateRet(RetValue);
+	// RETURN expr always returns 0.0.
+	return Constant::getNullValue(Type::getDoubleTy(TheContext));
 }
 
 //打印语句代码生成codegen()
@@ -281,6 +416,8 @@ static void InitializeModuleAndPassManager() {
 	// Create a new pass manager attached to it.
 	TheFPM = llvm::make_unique<legacy::FunctionPassManager>(TheModule.get());
 
+	// Promote allocas to registers.
+	TheFPM->add(createPromoteMemoryToRegisterPass());
 	// Do simple "peephole" optimizations and bit-twiddling optzns.
 	TheFPM->add(createInstructionCombiningPass());
 	// Reassociate expressions.
@@ -326,7 +463,24 @@ static void HandleDefinition() {
 		}
 	}
 	else {
-		 //Skip token for error recovery.
+		//Skip token for error recovery.
+		getNextToken();
+	}
+}
+
+static void HandleBlock() {
+	if (auto FnAST = ParseBlock()) {
+		if (auto *FnIR = FnAST->codegen()) {
+			fprintf(stderr, "Read Block definition:");
+			FnIR->print(errs());
+			fprintf(stderr, "\n");
+			TheJIT->addModule(std::move(TheModule));
+			InitializeModuleAndPassManager();
+
+		}
+	}
+	else {
+		//Skip token for error recovery.
 		getNextToken();
 	}
 }
@@ -433,6 +587,9 @@ static void MainLoop() {
 			break;
 		case tok_var:
 			HandleDeclaration();
+			break;
+		case '{':
+			HandleBlock();
 			break;
 		case tok_eof:
 			return;
