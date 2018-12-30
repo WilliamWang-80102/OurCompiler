@@ -70,16 +70,6 @@ namespace {
 			//:Names(std::move(VarNames)), Body(std::move(Body)) {}
 	};
 
-	/// AssignExpr - 负责处理赋值表达式
-	class AssignExpr : public ExprAST {
-		std::string Ident;
-		std::unique_ptr<ExprAST> Expr;
-	public:
-		AssignExpr(std::string Ident, std::unique_ptr<ExprAST> Expr)
-			:Ident(Ident), Expr(std::move(Expr)) {}
-		Value *codegen() override;
-	};
-
 	/// BinaryExprAST - Expression class for a binary operator.
 	class BinaryExprAST : public ExprAST {
 		int Op;

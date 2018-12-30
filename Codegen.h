@@ -97,7 +97,7 @@ Value *BinaryExprAST::codegen() {
 
 Value *CallExprAST::codegen() {
 	// Look up the name in the global module table.
-	Function *CalleeF = TheModule->getFunction(Callee);
+	Function *CalleeF = getFunction(Callee);
 	if (!CalleeF)
 		return LogErrorV("Unknown function referenced");
 
@@ -120,10 +120,6 @@ Value *StringAST::codegen() {
 }
 
 Value *NullStatAST::codegen() {
-	return nullptr;
-}
-
-Value *AssignExpr::codegen() {
 	return nullptr;
 }
 
@@ -430,6 +426,7 @@ static void InitializeModuleAndPassManager() {
 	TheFPM->doInitialization();
 }
 
+
 static void HandleContinue() {
 	if (ParseNullExpr()) {
 		fprintf(stderr, "Parsed a null expression.\n");
@@ -459,7 +456,6 @@ static void HandleDefinition() {
 			fprintf(stderr, "\n");
 			TheJIT->addModule(std::move(TheModule));
 			InitializeModuleAndPassManager();
-
 		}
 	}
 	else {
@@ -601,11 +597,6 @@ static void MainLoop() {
 		default:
 			LogError("Error!");
 			fprintf(stderr, "ready> ");
-			//getNextToken();
-			/*
-			//报错则清空输入流中的数据，期待用户重新输入
-			while (getNextToken() != '\n') {}
-			*/
 			//期待下一项输出
 			getNextToken();
 			break;
