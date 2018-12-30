@@ -120,25 +120,6 @@ static std::unique_ptr<ExprAST> ParseNullExpr() {
 static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	std::string IdName = IdentifierStr;
 	getNextToken(); // eat identifier.
-	/*
-	//如果标志符后为赋值符号
-	if (CurTok == ':')
-	{
-		getNextToken();
-		if (CurTok == '=')
-		{
-			//滤掉'='
-			getNextToken();
-			std::unique_ptr<ExprAST> RHS = ParseExpression();
-			if (RHS) {
-				fprintf(stderr, "Parsed an assignment statement\n");
-				return llvm::make_unique<AssignExpr>(IdName, std::move(RHS));
-			}
-		}
-		else
-			return LogError("Expect ':=', error at ParseIdentifierExpr");// 没有'='的异常处理
-	}
-	*/
 	
 	// 简单变量
 	if (CurTok != '(') 
@@ -150,10 +131,12 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	//该if语句可以优化
 	if (CurTok != ')') {
 		while (true) {
-			if (auto Arg = ParseExpression())
+			if (auto Arg = ParseExpression()) {
 				Args.push_back(std::move(Arg));
-			else
+			}
+			else {
 				return nullptr;
+			}
 
 			if (CurTok == ')')
 				break;
