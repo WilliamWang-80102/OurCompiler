@@ -51,41 +51,20 @@ std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
 	return nullptr;
 }
 
-static std::unique_ptr<ExprAST> ParseNullExpr();
 static std::unique_ptr<ExprAST> ParseNumberExpr();
 static std::unique_ptr<ExprAST> ParseParenExpr();
 static std::unique_ptr<ExprAST> ParseIdentifierExpr();
 static std::unique_ptr<ExprAST> ParseBinOpRHS(int, std::unique_ptr<ExprAST>);
 static std::unique_ptr<ExprAST> ParseExpression();
 static std::unique_ptr<ExprAST> ParseReturnExpr();
-static std::unique_ptr<ExprAST> ParsePrintExpr();
 static std::unique_ptr<ExprAST> ParseWhileExpr();
 static std::unique_ptr<ExprAST> ParseIfExpr();
 static std::unique_ptr<ExprAST> ParseDclrExpr();
 static std::unique_ptr<ExprAST> ParsePrimary();
 static std::unique_ptr<PrototypeAST> ParsePrototype();
-static std::unique_ptr<FunctionAST> ParseTopLevelExpr();
-static std::unique_ptr<FunctionAST> ParseBlock();
 static std::unique_ptr<PrototypeAST> ParseExtern();
 static std::unique_ptr<ExprsAST> ParseStats();
 static std::unique_ptr<ExprAST> ParseStat();
-static std::unique_ptr<ExprAST> ParseString();
-
-
-///print语句中字符串节点
-static std::unique_ptr<ExprAST> ParseString()
-{
-	std::string str = "";
-	char c;
-	while ((c = getchar()) != '"') {
-		str += c;
-		if (c == '\n') {
-			return LogError("Expect '\"'");
-		}
-	}
-	auto Result = llvm::make_unique<StringAST>(str);
-	return std::move(Result);
-}
 
 /// numberexpr ::= number
 static std::unique_ptr<ExprAST> ParseNumberExpr() {
@@ -107,12 +86,6 @@ static std::unique_ptr<ExprAST> ParseParenExpr() {
 	return V;
 }
 
-/// NullExpr ::= CONTINUE;
-static std::unique_ptr<ExprAST> ParseNullExpr() {
-	getNextToken();
-	return llvm::make_unique<NullStatAST>();
-}
-
 /// identifierexpr
 ///   ::= identifier
 ///   ::= identifier '(' expression* ')'
@@ -120,30 +93,6 @@ static std::unique_ptr<ExprAST> ParseNullExpr() {
 static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	std::string IdName = IdentifierStr;
 	getNextToken(); // eat identifier.
-<<<<<<< HEAD
-	/*
-	//如果标志符后为赋值符号
-	if (CurTok == ':')
-	{
-		getNextToken();
-		if (CurTok == '=')
-		{
-			//滤掉'='
-			getNextToken();
-			std::unique_ptr<ExprAST> RHS = ParseExpression();
-			if (RHS) {
-				fprintf(stderr, "Parsed an assignment statement\n");
-				return llvm::make_unique<AssignExpr>(IdName, std::move(RHS));
-			}
-		}
-		else
-			return LogError("Expect ':=', error at ParseIdentifierExpr");// 没有'='的异常处理
-	}
-	*/
-
-=======
-	
->>>>>>> db4d83b963d16dcdf0c212e12ae0fa6bece31451
 	// 简单变量
 	if (CurTok != '(')
 		return llvm::make_unique<VariableExprAST>(IdName);
@@ -185,37 +134,6 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
 		return llvm::make_unique<RetStatAST>(std::move(Expr));
 	else
 		return LogError("Expect return value!");
-}
-
-//ParsePrintExpr - 实现打印语句
-static std::unique_ptr<ExprAST> ParsePrintExpr()
-{
-	std::vector <std::unique_ptr<ExprAST>> Args;
-	//消耗掉 PRINT
-	getNextToken();
-	if (CurTok == '"') {
-		//getPrintString()函数用于获取双引号之间的内容
-		Args.push_back(ParseString());
-		getNextToken();
-	}
-	if (CurTok == tok_identifier) {
-		auto E = ParseExpression();
-		if (E) {
-			Args.push_back(std::move(E));
-		}
-		/*else {
-		return LogError("Unexpected token");
-		}*/
-	}
-	/*
-	if (CurTok != ',') {
-		getNextToken();
-		return LogError("Unexpected token");
-	}
-	*/
-
-	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
-	return Result;
 }
 
 //处理IF和WHILE后面的条件语句
@@ -441,28 +359,6 @@ static std::unique_ptr<FunctionAST> ParseDefinition() {
 	return nullptr;
 }
 
-/// toplevelexpr ::= expression
-static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
-	if (auto E = ParseExpression()) {
-		// Make an anonymous proto.
-		auto Proto = llvm::make_unique<PrototypeAST>("__anon_expr",
-			std::vector<std::string>());
-		return llvm::make_unique<FunctionAST>(std::move(Proto), std::move(E));
-	}
-	return nullptr;
-}
-
-static std::unique_ptr<FunctionAST> ParseBlock() 
-{
-	if (auto E = ParseStats()) {
-		// Make an anonymous proto.
-		auto Proto = llvm::make_unique<PrototypeAST>("__anon_expr",
-			std::vector<std::string>());
-		return llvm::make_unique<FunctionAST>(std::move(Proto), std::move(E));
-	}
-	return nullptr;
-}
-
 /// external ::= 'extern' prototype
 static std::unique_ptr<PrototypeAST> ParseExtern() {
 	getNextToken(); // eat extern.
@@ -508,10 +404,6 @@ static std::unique_ptr<ExprAST> ParseStat() {
 		//RETURN
 	case tok_return:
 		return ParseReturnExpr();
-
-		//PRINT
-	case tok_print:
-		return ParsePrintExpr();
 
 	default:
 		return ParseExpression();

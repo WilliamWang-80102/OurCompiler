@@ -1,6 +1,7 @@
 #pragma once
 #include "KaleidoscopeJIT.h"
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
@@ -13,8 +14,13 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Host.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
@@ -28,6 +34,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <system_error>
+#include <utility>
 
 #define NUM_EXPR "NumberExpression"
 #define VAR_EXPR "VariableExpression"
@@ -45,4 +53,5 @@
 #define WHILE_EXPR "WhileExpression"
 
 using namespace llvm;
+using namespace llvm::sys;
 using namespace llvm::orc;

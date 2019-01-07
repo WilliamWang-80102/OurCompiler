@@ -114,14 +114,6 @@ Value *CallExprAST::codegen() {
 	return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
-Value *StringAST::codegen() {
-	return nullptr;
-}
-
-Value *NullStatAST::codegen() {
-	return nullptr;
-}
-
 Value *WhileStatAST::codegen() {
 	Function *TheFunction = Builder.GetInsertBlock()->getParent();
 	std::string VarName = "i";
@@ -329,17 +321,10 @@ Function *FunctionAST::codegen() {
 		}
 	}
 	// Run the optimizer on the function.
-	TheFPM->run(*TheFunction);
+	//TheFPM->run(*TheFunction);
 
 	return TheFunction;
 	
-}
-
-//string的代码生成
-Value *StringAST::Codegen()
-{
-	Value *V = NamedValues[str];
-	return V;
 }
 
 //返回语句代码生成codegen()
@@ -347,17 +332,4 @@ Value *RetStatAST::codegen()
 {
 	Value * RetValue = Expr->codegen();
 	return Builder.CreateRet(RetValue);
-}
-
-//打印语句代码生成codegen()
-Value *PrtStatAST::codegen()
-{
-
-	/*std::vector<Value *> ArgsP;
-	for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-	ArgsP.push_back(Args[i]->codegen());
-	}
-	return Builder.CreatePrt(ArgsP);*/
-
-	return nullptr;
 }

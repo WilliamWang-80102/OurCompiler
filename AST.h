@@ -23,20 +23,6 @@ namespace {
 		char *getType() override { return "NumberExprAST"; }
 	};
 
-	///StringAST
-	class StringAST : public ExprAST {
-		std::string str;
-
-	public:
-		StringAST(std::string str) : str(str) {}
-		virtual Value *Codegen();
-		virtual void printAST() {
-			//输出字符串结点
-		};
-		Value *codegen() override;
-		char *getType() override { return "StringAST"; }
-	};
-
 	/// VariableExprAST - Expression class for referencing a variable, like "a".
 	class VariableExprAST : public ExprAST {
 		std::string Name;
@@ -144,24 +130,6 @@ namespace {
 		RetStatAST(std::unique_ptr<ExprAST> Expr) : Expr(std::move(Expr)) {}
 		Value *codegen() override;
 		char *getType() override { return "RetStatAST"; }
-	};
-
-	/// PrtStatAST - 打印语句结点
-	/// 打印语句后面的多个待输出表达式或字符串： PRINT print_item1, print_item2...
-	class PrtStatAST : public ExprAST {
-		std::vector<std::unique_ptr<ExprAST>> Args;
-	public:
-		PrtStatAST(std::vector<std::unique_ptr<ExprAST>> Args) : Args(std::move(Args)) {}
-		Value *codegen() override;
-		char *getType() override { return "PrtStatAST"; }
-	};
-
-	/// NullStatAST - 空语句结点
-	class NullStatAST : public ExprAST {
-	public:
-		NullStatAST() {}
-		Value *codegen() override;
-		char *getType() override { return "NullStatAST"; }
 	};
 
 	/// IfStatAST - 条件语句结点

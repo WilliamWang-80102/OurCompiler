@@ -10,34 +10,6 @@
 static void InitializeModuleAndPassManager() {
 	// Open a new module.
 	TheModule = llvm::make_unique<Module>("my cool jit", TheContext);
-	TheModule->setDataLayout(TheJIT->getTargetMachine().createDataLayout());
-
-	// Create a new pass manager attached to it.
-	TheFPM = llvm::make_unique<legacy::FunctionPassManager>(TheModule.get());
-
-	// Promote allocas to registers.
-	TheFPM->add(createPromoteMemoryToRegisterPass());
-	// Do simple "peephole" optimizations and bit-twiddling optzns.
-	TheFPM->add(createInstructionCombiningPass());
-	// Reassociate expressions.
-	TheFPM->add(createReassociatePass());
-	// Eliminate Common SubExpressions.
-	TheFPM->add(createGVNPass());
-	// Simplify the control flow graph (deleting unreachable blocks, etc).
-	TheFPM->add(createCFGSimplificationPass());
-
-	TheFPM->doInitialization();
-}
-
-static void HandleDeclaration() {
-	if (ParseDclrExpr()) {
-		fprintf(stderr, "Parsed a declaration statement.\n");
-		//getNextToken();
-	}
-	else {
-		// Skip token for error recovery.
-		getNextToken();
-	}
 }
 
 static void HandleDefinition() {
@@ -46,66 +18,7 @@ static void HandleDefinition() {
 			fprintf(stderr, "Read function definition:");
 			FnIR->print(errs());
 			fprintf(stderr, "\n");
-			TheJIT->addModule(std::move(TheModule));
-			InitializeModuleAndPassManager();
 		}
-	}
-	else {
-		//Skip token for error recovery.
-		getNextToken();
-	}
-}
-
-static void HandleTopLevelExpression() {
-	// Evaluate a top-level expression into an anonymous function.
-	if (auto FnAST = ParseTopLevelExpr()) {
-		if (auto *FnIR = FnAST->codegen()) {
-			fprintf(stderr, "Read top-level expression:");
-			FnIR->print(errs());
-			fprintf(stderr, "\n");
-		}
-	}
-	else {
-		// Skip token for error recovery.
-		getNextToken();
-	}
-}
-
-static void HandleIf() {
-	if (ParseIfExpr()) {
-		fprintf(stderr, "Parsed a if statement\n");
-	}
-	else {
-		//Skip token for error recovery.
-		getNextToken();
-	}
-}
-
-static void HandleWhile() {
-	if (ParseWhileExpr()) {
-		fprintf(stderr, "Parse a while statement\n");
-	}
-	else {
-		//Skip token for error recovery.
-		getNextToken();
-	}
-}
-
-static void HandlePrint() {
-	if (ParsePrintExpr()) {
-		fprintf(stderr, "Parse a print statement\n");
-		getNextToken();
-	}
-	else {
-		//Skip token for error recovery.
-		getNextToken();
-	}
-}
-
-static void HandleReturn() {
-	if (ParseReturnExpr()) {
-		fprintf(stderr, "Parse a return statement\n");
-		getNextToken();
 	}
 	else {
 		//Skip token for error recovery.
@@ -132,41 +45,11 @@ static void HandleIdentifierExpr() {
 	}
 }
 
-static void HandleContinue() {
-	if (ParseNullExpr()) {
-		fprintf(stderr, "Parsed a null expression.\n");
-	}
-	else {
-		// Skip token for error recovery.
-		getNextToken();
-	}
-}
-/// top ::= definition | external | expression | ';'
-
 static void MainLoop() {
 	while (true) {
 		switch (CurTok) {
 		case tok_func:
 			HandleDefinition();
-			break;
-		case tok_identifier:
-			//ParseIdentifierExpr();
-			HandleIdentifierExpr();
-			break;
-		case tok_return:
-			HandleReturn();
-			break;
-		case tok_print:
-			HandlePrint();
-			break;
-		case tok_if:
-			HandleIf();
-			break;
-		case tok_while:
-			HandleWhile();
-			break;
-		case tok_var:
-			HandleDeclaration();
 			break;
 		case tok_eof:
 			return;
@@ -190,29 +73,75 @@ static void MainLoop() {
 //===----------------------------------------------------------------------===//
 
 int main() {
-	InitializeNativeTarget();
-	InitializeNativeTargetAsmPrinter();
-	InitializeNativeTargetAsmParser();
-
 	// Install standard binary operators.
 	// 1 is lowest precedence.
-	BinopPrecedence[':='] = 2;
+	BinopPrecedence[':='] = 5;
 	BinopPrecedence['+'] = 20;
 	BinopPrecedence['-'] = 20;
-	BinopPrecedence['*'] = 40;
+	BinopPrecedence['*'] = 40; 
 	BinopPrecedence['/'] = 40;// highest.
-	//这里增加运算符的优先级
 
 	// Prime the first token.
 	fprintf(stderr, "ready> ");
 	getNextToken();
-	TheJIT = llvm::make_unique<KaleidoscopeJIT>();
+
 	InitializeModuleAndPassManager();
-	
+
 	// Run the main "interpreter loop" now.
 	MainLoop();
-	
-	//system("pause");
+
+	// Initialize the target registry etc.
+	InitializeAllTargetInfos();
+	InitializeAllTargets();
+	InitializeAllTargetMCs();
+	InitializeAllAsmParsers();
+	InitializeAllAsmPrinters();
+
+	auto TargetTriple = sys::getDefaultTargetTriple();
+	TheModule->setTargetTriple(TargetTriple);
+
+	std::string Error;
+	auto Target = TargetRegistry::lookupTarget(TargetTriple, Error);
+
+	// Print an error and exit if we couldn't find the requested target.
+	// This generally occurs if we've forgotten to initialise the
+	// TargetRegistry or we have a bogus target triple.
+	if (!Target) {
+		errs() << Error;
+		return 1;
+	}
+
+	auto CPU = "generic";
+	auto Features = "";
+
+	TargetOptions opt;
+	auto RM = Optional<Reloc::Model>();
+	auto TheTargetMachine =
+		Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+
+	TheModule->setDataLayout(TheTargetMachine->createDataLayout());
+
+	auto Filename = "output.o";
+	std::error_code EC;
+	raw_fd_ostream dest(Filename, EC, sys::fs::F_None);
+
+	if (EC) {
+		errs() << "Could not open file: " << EC.message();
+		return 1;
+	}
+
+	legacy::PassManager pass;
+	auto FileType = TargetMachine::CGFT_ObjectFile;
+
+	if (TheTargetMachine->addPassesToEmitFile(pass, dest, FileType)) {
+		errs() << "TheTargetMachine can't emit a file of this type";
+		return 1;
+	}
+
+	pass.run(*TheModule);
+	dest.flush();
+
+	outs() << "Wrote " << Filename << "\n";
+
 	return 0;
 }
-
