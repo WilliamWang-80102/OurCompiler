@@ -10,6 +10,7 @@ namespace {
 	public:
 		virtual ~ExprAST() = default;
 		virtual Value *codegen() = 0;
+		virtual char *getType() = 0;
 	};
 
 	/// NumberExprAST - Expression class for numeric literals like "1.0".
@@ -19,6 +20,7 @@ namespace {
 	public:
 		NumberExprAST(double Val) : Val(Val) {}
 		Value *codegen() override;
+		char *getType() override { return "NumberExprAST"; }
 	};
 
 	///StringAST
@@ -32,6 +34,7 @@ namespace {
 			//输出字符串结点
 		};
 		Value *codegen() override;
+		char *getType() override { return "StringAST"; }
 	};
 
 	/// VariableExprAST - Expression class for referencing a variable, like "a".
@@ -42,6 +45,7 @@ namespace {
 		VariableExprAST(const std::string &Name) : Name(Name) {}
 		Value *codegen() override;
 		const std::string &getName() const { return Name; }
+		char *getType() override { return "VariableExprAST"; }
 	};
 
 	/// DeclareExprAST - Expression like 'VAR x,y,z'.
@@ -53,6 +57,7 @@ namespace {
 			: VarNames(std::move(VarNames)) {}
 
 		Value *codegen() override;
+		char *getType() override { return "DeclareExprAST"; }
 	};
 
 	/// UnaryExprAST - Expression class for a unary operator.
@@ -65,6 +70,7 @@ namespace {
 			: Opcode(Opcode), Operand(std::move(Operand)) {}
 
 		Value *codegen() override;
+		char *getType() override { return "UnaryExprAST"; }
 	};
 
 	/// BinaryExprAST - Expression class for a binary operator.
@@ -77,6 +83,7 @@ namespace {
 			std::unique_ptr<ExprAST> RHS)
 			: Op(Op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
 		Value *codegen() override;
+		char *getType() override { return "BinaryExprAST"; }
 	};
 
 	/// CallExprAST - Expression class for function calls.
@@ -89,6 +96,7 @@ namespace {
 			std::vector<std::unique_ptr<ExprAST>> Args)
 			: Callee(Callee), Args(std::move(Args)) {}
 		Value *codegen() override;
+		char *getType() override { return "CallExprAST"; }
 	};
 
 	/// PrototypeAST - This class represents the "prototype" for a function,
@@ -125,6 +133,7 @@ namespace {
 		ExprsAST(std::vector<std::unique_ptr<ExprAST>> Stats)
 			:Stats(std::move(Stats)) {}
 		Value *codegen() override;
+		char *getType() override { return "ExprsAST"; }
 	};
 
 	///RetStatAST - 返回语句结点
@@ -133,6 +142,7 @@ namespace {
 	public:
 		RetStatAST(std::unique_ptr<ExprAST> Expr) : Expr(std::move(Expr)) {}
 		Value *codegen() override;
+		char *getType() override { return "RetStatAST"; }
 	};
 
 	/// PrtStatAST - 打印语句结点
@@ -142,6 +152,7 @@ namespace {
 	public:
 		PrtStatAST(std::vector<std::unique_ptr<ExprAST>> Args) : Args(std::move(Args)) {}
 		Value *codegen() override;
+		char *getType() override { return "PrtStatAST"; }
 	};
 
 	/// NullStatAST - 空语句结点
@@ -149,6 +160,7 @@ namespace {
 	public:
 		NullStatAST() {}
 		Value *codegen() override;
+		char *getType() override { return "NullStatAST"; }
 	};
 
 	/// IfStatAST - 条件语句结点
@@ -165,6 +177,7 @@ namespace {
 			Then(std::move(ThenStat)),
 			Else(std::move(ElseStat)) {}
 		Value *codegen() override;
+		char *getType() override { return "IfStatAST"; }
 	};
 
 	/// WhileStatAST - 当循环语句结点
@@ -176,6 +189,7 @@ namespace {
 			std::unique_ptr<ExprAST> Stat)
 			:Cond(std::move(Cond)), Stat(std::move(Stat)) {}
 		Value *codegen() override;
+		char *getType() override { return "WhileStatAST"; }
 	};
 
 } // end anonymous namespace

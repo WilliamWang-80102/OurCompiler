@@ -1,5 +1,4 @@
 #pragma once
-#include "Include.h"
 #include "Lexer.h"
 #include "AST.h"
 
@@ -207,18 +206,19 @@ static std::unique_ptr<ExprAST> ParseConditionExpr() {
 //ParseWhileExpr - 实现While循环
 static std::unique_ptr<ExprAST> ParseWhileExpr() {
 	getNextToken();//eat WHILE
-	std::unique_ptr<ExprAST> Cond, Stat;
+	std::unique_ptr<ExprAST> Cond;
+	std::unique_ptr<ExprAST> Stats;
 	std::unique_ptr<WhileStatAST> WhilePtr;
 	Cond = ParseConditionExpr();
 	if (CurTok == tok_do) {
 		getNextToken();//eat DO
-		Stat = ParseStats();
-		if (!Stat) return LogError("Expect 'DO' statements!");
+		Stats = ParseStats();
+		if (!Stats) return LogError("Expect 'DO' statements!");
 	}
 	else return LogError("Expect 'DO'!");
 	if (CurTok == tok_done) {
 		getNextToken();//eat DONE
-		WhilePtr = llvm::make_unique<WhileStatAST>(std::move(Cond), std::move(Stat));
+		WhilePtr = llvm::make_unique<WhileStatAST>(std::move(Cond), std::move(Stats));
 		return WhilePtr;
 	}
 	else return LogError("Expect 'DONE'!");//读到done可以安全退出
