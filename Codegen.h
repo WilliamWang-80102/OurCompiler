@@ -138,26 +138,20 @@ Value *WhileStatAST::codegen() {
 	Builder.SetInsertPoint(LoopBB);
 	//AllocaInst *OldVal = NamedValues[VarName];
 	NamedValues[VarName] = Alloca;
-	
 	if (!Stat->codegen())
 		return nullptr;
-	
 	//Value *CurVar = Builder.CreateLoad(Alloca, VarName.c_str());
 	Value *CurVar = Cond->codegen();
 	CurVar = Builder.CreateFCmpONE(
 		CurVar, ConstantFP::get(TheContext, APFloat(0.0)), "loopcond1");
-	
 	BasicBlock *LoopEndBB = Builder.GetInsertBlock();
 	Builder.CreateCondBr(CurVar, LoopBB, AfterBB);
 	TheFunction->getBasicBlockList().push_back(AfterBB);
 	Builder.SetInsertPoint(AfterBB);
-	
-		
 	/*if (OldVal)
 	NamedValues[VarName] = OldVal;
 	else
 	NamedValues.erase(VarName);*/
-	
 	// for expr always returns 0.0.
 	return Constant::getNullValue(Type::getDoubleTy(TheContext));
 }
@@ -248,7 +242,7 @@ Value *DeclareExprAST::codegen() {
 		// Remember this binding.
 		NamedValues[VarName] = Alloca;
 	}
-	
+
 	// Return the body computation.
 	return Constant::getNullValue(Type::getDoubleTy(TheContext));
 }
@@ -268,8 +262,8 @@ Value *UnaryExprAST::codegen() {
 Value *ExprsAST::codegen() {
 	Value * BlockValue = Constant::getNullValue(Type::getDoubleTy(TheContext));
 	//将语句块的内容全部转化为ir
-
 	for (std::vector<std::unique_ptr<ExprAST>>::const_iterator iter = Stats.cbegin(); 
+
 		iter != Stats.cend(); iter++) {
 		//如果语句为返回语句，将返回值计算给BlockValue
 		if (strcmp((*iter)->getType(), "RetStatAST") == 0 ) {
@@ -279,7 +273,6 @@ Value *ExprsAST::codegen() {
 	}
 	//语句块分析结束，不返回指针
 	return BlockValue;
-	
 }
 
 Function *PrototypeAST::codegen() {
@@ -323,7 +316,7 @@ Function *FunctionAST::codegen() {
 		// Add arguments to variable symbol table.
 		NamedValues[Arg.getName()] = Alloca;
 	}
-	
+
 	Body->codegen();
 
 	// Validate the generated code, checking for consistency.
@@ -335,7 +328,6 @@ Function *FunctionAST::codegen() {
 			return nullptr;
 		}
 	}
-	
 	// Run the optimizer on the function.
 	TheFPM->run(*TheFunction);
 

@@ -10,7 +10,7 @@
 /// token the parser is looking at.  getNextToken reads another token from the
 /// lexer and updates CurTok with its results.
 static int CurTok;
-static int getNextToken() { 
+static int getNextToken() {
 	CurTok = gettok();
 	//如果读到':'，则检查是否为赋值符号':='
 	if (CurTok == ':') {
@@ -33,7 +33,7 @@ static std::map<char, int> BinopPrecedence;
 static int GetTokPrecedence() {
 	if ((CurTok != ':=') && !isascii(CurTok))
 		return -1;
-	
+
 	// Make sure it's a declared binop.
 	int TokPrec = BinopPrecedence[CurTok];
 	if (TokPrec <= 0)
@@ -65,6 +65,7 @@ static std::unique_ptr<ExprAST> ParseDclrExpr();
 static std::unique_ptr<ExprAST> ParsePrimary();
 static std::unique_ptr<PrototypeAST> ParsePrototype();
 static std::unique_ptr<FunctionAST> ParseTopLevelExpr();
+static std::unique_ptr<FunctionAST> ParseBlock();
 static std::unique_ptr<PrototypeAST> ParseExtern();
 static std::unique_ptr<ExprsAST> ParseStats();
 static std::unique_ptr<ExprAST> ParseStat();
@@ -119,9 +120,32 @@ static std::unique_ptr<ExprAST> ParseNullExpr() {
 static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 	std::string IdName = IdentifierStr;
 	getNextToken(); // eat identifier.
+<<<<<<< HEAD
+	/*
+	//如果标志符后为赋值符号
+	if (CurTok == ':')
+	{
+		getNextToken();
+		if (CurTok == '=')
+		{
+			//滤掉'='
+			getNextToken();
+			std::unique_ptr<ExprAST> RHS = ParseExpression();
+			if (RHS) {
+				fprintf(stderr, "Parsed an assignment statement\n");
+				return llvm::make_unique<AssignExpr>(IdName, std::move(RHS));
+			}
+		}
+		else
+			return LogError("Expect ':=', error at ParseIdentifierExpr");// 没有'='的异常处理
+	}
+	*/
+
+=======
 	
+>>>>>>> db4d83b963d16dcdf0c212e12ae0fa6bece31451
 	// 简单变量
-	if (CurTok != '(') 
+	if (CurTok != '(')
 		return llvm::make_unique<VariableExprAST>(IdName);
 
 	// Call.
@@ -157,9 +181,9 @@ static std::unique_ptr<ExprAST> ParseReturnExpr()
 {
 	getNextToken();//eat RETURN
 	std::unique_ptr<ExprAST> Expr = ParseExpression();
-	if (Expr) 
+	if (Expr)
 		return llvm::make_unique<RetStatAST>(std::move(Expr));
-	else 
+	else
 		return LogError("Expect return value!");
 }
 
@@ -189,7 +213,7 @@ static std::unique_ptr<ExprAST> ParsePrintExpr()
 		return LogError("Unexpected token");
 	}
 	*/
-	
+
 	auto Result = llvm::make_unique<PrtStatAST>(std::move(Args));
 	return Result;
 }
@@ -428,6 +452,17 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 	return nullptr;
 }
 
+static std::unique_ptr<FunctionAST> ParseBlock() 
+{
+	if (auto E = ParseStats()) {
+		// Make an anonymous proto.
+		auto Proto = llvm::make_unique<PrototypeAST>("__anon_expr",
+			std::vector<std::string>());
+		return llvm::make_unique<FunctionAST>(std::move(Proto), std::move(E));
+	}
+	return nullptr;
+}
+
 /// external ::= 'extern' prototype
 static std::unique_ptr<PrototypeAST> ParseExtern() {
 	getNextToken(); // eat extern.
@@ -469,7 +504,7 @@ static std::unique_ptr<ExprAST> ParseStat() {
 		//WHILE
 	case tok_while:
 		return ParseWhileExpr();
-		
+
 		//RETURN
 	case tok_return:
 		return ParseReturnExpr();

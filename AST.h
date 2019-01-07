@@ -50,6 +50,7 @@ namespace {
 
 	/// DeclareExprAST - Expression like 'VAR x,y,z'.
 	class DeclareExprAST : public ExprAST {
+
 		std::vector<std::pair<std::string, std::unique_ptr<ExprAST>>> VarNames;
 		//std::unique_ptr<ExprAST> Body;
 	public:
